@@ -1,0 +1,14 @@
+entity Course { students: Set<Student> };
+entity Role;
+entity Staff in [Course] { role: Role };
+entity Student;
+entity Assignment { course: Course };
+
+action PostNextAssignment
+  appliesTo { principal: [Staff], resource: [Course] };
+action EditAssignment
+  appliesTo { principal: [Staff], resource: [Assignment] };
+action GradeSubmission
+  appliesTo { principal: [Staff], resource: [Assignment] };
+action ViewGrades
+  appliesTo { principal: [Staff,Student], resource: [Assignment,Student] }

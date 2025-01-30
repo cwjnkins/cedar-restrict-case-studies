@@ -3,7 +3,7 @@
 module Lib.IO where
 
 import Data.Aeson
-import qualified Data.ByteString.Lazy as B
+
 import qualified Data.ByteString.Lazy.UTF8 as B
 import Data.Char
 import Data.Function

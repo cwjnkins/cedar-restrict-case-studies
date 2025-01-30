@@ -39,3 +39,12 @@ getEntityName e = e & (uid >>> __entity >>> _id)
 
 instance CedarFormat (Entity a) where
   cedarFormat (Entity uid _ _) = cedarFormat uid
+
+modifyAtUID :: UID -> (Entity a -> Entity a) -> [Entity a] -> [Entity a]
+modifyAtUID u f [] = []
+modifyAtUID u f (e:es)
+  | u == uid e = f e : es
+  | otherwise  = e : modifyAtUID u f es
+
+addParent :: UID -> Entity a -> Entity a
+addParent u e = e { parents = u : parents e }

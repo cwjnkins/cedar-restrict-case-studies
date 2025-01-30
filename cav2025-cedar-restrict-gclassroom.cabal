@@ -29,9 +29,13 @@ library
       Lib.Action
       Lib.CedarFormat
       Lib.Entity
+      Lib.GClassroom
       Lib.GClassroom.Ops
       Lib.GClassroom.Types
       Lib.IO
+      Lib.ProjMan
+      Lib.ProjMan.Ops
+      Lib.ProjMan.Types
       Lib.Request
       Lib.Util
   other-modules:
@@ -57,7 +61,10 @@ executable cav2025-cedar-restrict-gclassroom-exe
   main-is: Main.hs
   other-modules:
       Config
-      LogGen
+      GClassroom.GenEntities
+      GClassroom.GenLogs
+      ProjMan.GenEntities
+      ProjMan.GenLogs
       Paths_cav2025_cedar_restrict_gclassroom
   autogen-modules:
       Paths_cav2025_cedar_restrict_gclassroom

@@ -1,5 +1,5 @@
 {-# LANGUAGE ScopedTypeVariables, RecordWildCards #-}
-module LogGen where
+module GClassroom.GenLogs where
 
 import Data.Function
 import Control.Monad
@@ -7,6 +7,7 @@ import Control.Monad.State.Strict
 import System.Random
 
 import Lib
+import Lib.GClassroom
 import Lib.Util
 
 import Config
@@ -85,8 +86,8 @@ dViewGrades__StudentStudent GClassroom{..} = do
   s2 <- students & filter (\s -> uid s /= uid s1) & randomElem
   return $ mkRequest' s1 (toAction ViewGrades) s2
 
-createEventLog :: RandomGen g => GCConfig -> GClassroom -> State g [Request']
-createEventLog GCConfig{..} gc@GClassroom{..} =
+createEventLog :: RandomGen g => Config -> GClassroom -> State g [Request']
+createEventLog GC{..} gc@GClassroom{..} =
     forM assignments (\ assign -> do
       posts <- postAssignReqs assign
       edits <- editAssignReqs assign

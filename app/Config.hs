@@ -13,6 +13,8 @@ data Config =
       , numTAs                :: Int
       , maxCourseAssignments  :: Int
 
+      , exercisedOverprivilege :: Int
+
       , seed                  :: Int
       , entityStore           :: FilePath
       , policyStore           :: FilePath
@@ -54,6 +56,9 @@ gclass = GC
   , numAdditionalTeachers = 9   &= help "(Default: 9)"
   , numTAs                = 6   &= help "(Default: 6)"
   , maxCourseAssignments  = 5   &= help "(Default: 5)"
+
+  , exercisedOverprivilege = 0 &= help "Percentage of exercised overprivileges (Default: 0)"
+
   , seed                  = 2025
   , entityStore           =    "./assets/gclassroom/entities.json"
                             &= typFile

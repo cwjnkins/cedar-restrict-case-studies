@@ -28,7 +28,7 @@ main :: IO ()
 main = do
   cnf <- cmdArgs conf
   case cnf of
-    GC _ _ _ _ _ _ _ _ _ _ -> gc cnf
+    GC _ _ _ _ _ _ _ _ _ _ _ -> gc cnf
     PM _ _ _ _ _ _ _ _ _ _ -> pm cnf
     HC _ _ _ _ _ _ _ _ _ _ _ -> hc cnf
   where

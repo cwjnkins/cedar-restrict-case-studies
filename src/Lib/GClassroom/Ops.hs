@@ -34,3 +34,15 @@ getCourseStaff gc@GClassroom{..} course =
         & filter (\ ta -> head (parents ta) == uid course)
   in
   (s1, s2)
+
+getStaffCourses :: GClassroom -> Staff -> [Course]
+getStaffCourses gc@GClassroom{..} staff =
+    courses
+  & filter (\ course -> (course & uid) `elem` (staff & parents))
+
+getCourseAssignments :: GClassroom -> Course -> [Assignment]
+getCourseAssignments gc@GClassroom{..} c =
+  assignments & filter (\ assign -> (assign & attrs & course) == (c & uid))
+
+getAllStaff :: GClassroom -> [Staff]
+getAllStaff GClassroom{..} = teachers ++ tas

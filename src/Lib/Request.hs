@@ -29,6 +29,9 @@ type Request' = Request Value
 mkRequest' :: Entity p -> Action -> Entity r -> Request'
 mkRequest' p a r = mkRequest p a r (object [])
 
+toRequest' :: Entity p -> Entity r -> Action -> Request'
+toRequest' p r a = mkRequest' p a r
+
 instance ToJSON c => ToJSON (Request c) where
   toJSON
     (Request

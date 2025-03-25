@@ -32,6 +32,8 @@ library
       Lib.GClassroom
       Lib.GClassroom.Ops
       Lib.GClassroom.Types
+      Lib.HotCRP
+      Lib.HotCRP.Ops
       Lib.HotCRP.Types
       Lib.IO
       Lib.ProjMan
@@ -64,6 +66,8 @@ executable cav2025-cedar-restrict-gclassroom-exe
       Config
       GClassroom.GenEntities
       GClassroom.GenLogs
+      HotCRP.GenEntities
+      HotCRP.GenLogs
       ProjMan.GenEntities
       ProjMan.GenLogs
       Paths_cav2025_cedar_restrict_gclassroom

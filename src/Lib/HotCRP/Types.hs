@@ -2,6 +2,7 @@
 module Lib.HotCRP.Types where
 
 import Data.Aeson
+import Data.Function
 import GHC.Generics
 
 import Lib.Action
@@ -19,6 +20,10 @@ data UserAttrs
   deriving (Generic, Show)
 
 instance ToJSON UserAttrs where
+  toJSON UserAttrs{..} = object $
+       ["isPCChair" .= isPCChair]
+    ++ (areaChair & maybe [] (\ area -> ["areaChair" .= area]))
+    ++ (pcMember  & maybe [] (\ area -> ["pcMember"  .= area]))
 
 type User = Entity UserAttrs
 mkUser :: String -> Bool -> Maybe Area -> Maybe Area -> User
@@ -31,7 +36,7 @@ mkUser name isPCChair areaChair pcMember =
 data PaperAttrs
   = PaperAttrs
     { authors    :: [UID]
-    , revieweres :: [UID]
+    , reviewers :: [UID]
     , area       :: UID
     }
   deriving (Generic, Show)
@@ -57,6 +62,7 @@ data ReviewAttrs =
   , isMetaReview :: Bool
   }
   deriving (Generic, Show)
+instance ToJSON ReviewAttrs where
 
 type Review = Entity ReviewAttrs
 mkReview :: String -> Paper -> User -> Bool -> Review
@@ -91,9 +97,16 @@ data HotCRPEntity =
   | HotCRPArea Area
   | HotCRPPaper Paper
   | HotCRPReview Review
+  deriving (Generic, Show)
+instance ToJSON HotCRPEntity where
+  toJSON (HotCRPUser user) = toJSON user
+  toJSON (HotCRPArea area) = toJSON area
+  toJSON (HotCRPPaper pap) = toJSON pap
+  toJSON (HotCRPReview rv) = toJSON rv
 
-toHotCRPEntities :: HotCRP -> [HotCRPEntity]
-toHotCRPEntities (HotCRP {..}) =
+
+toHCEntities :: HotCRP -> [HotCRPEntity]
+toHCEntities (HotCRP {..}) =
      map HotCRPUser users
   ++ map HotCRPArea areas
   ++ map HotCRPPaper papers

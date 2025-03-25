@@ -12,6 +12,7 @@ data Config =
       , numAdditionalTeachers :: Int
       , numTAs                :: Int
       , maxCourseAssignments  :: Int
+
       , seed                  :: Int
       , entityStore           :: FilePath
       , policyStore           :: FilePath
@@ -24,11 +25,26 @@ data Config =
       , numAccts    :: Int
       , numProjs    :: Int
       , maxProjSize :: Int
+
       , seed        :: Int
       , entityStore :: FilePath
       , policyStore :: FilePath
       , logs        :: FilePath
       }
+  | HC
+    { numPC         :: Int
+    , numAreas      :: Int
+    , numPCChairs   :: Int
+    , numNonPC      :: Int
+    , maxAreaPapers :: Int
+    , maxPaperAuthors :: Int
+    , maxPaperReviewers :: Int
+
+    , seed          :: Int
+    , entityStore   :: FilePath
+    , policyStore   :: FilePath
+    , logs          :: FilePath
+    }
   deriving (Show, Data, Typeable)
 
 gclass = GC
@@ -63,8 +79,23 @@ projman = PM
   , logs = "./assets/project-management/logs.json" &= typFile
   } &= help "Generate Cedar project management case study"
 
+hotcrp = HC
+  { numPC             = 10 &= help "(Default: 10)"
+  , numAreas          = 5  &= help "(Default: 5)"
+  , numPCChairs       = 3  &= help "(Default: 3)"
+  , numNonPC          = 15 &= help "(Default: 15)"
+  , maxAreaPapers     = 5  &= help "(Default: 5)"
+  , maxPaperAuthors   = 3  &= help "(Default: 3)"
+  , maxPaperReviewers = 5  &= help "(Default: 5)"
+
+  , seed        = 2025
+  , entityStore = "./assets/hotcrp/entities.json" &= typFile
+  , policyStore = "./assets/hotcrp/policies.cedar" &= typFile
+  , logs        = "./assets/hotcrp/logs.json" &= typFile
+  } &= help "Generate Cedar HotCRP case study"
+
 conf =
-     modes [gclass, projman]
+     modes [gclass, projman, hotcrp]
   &= summary "Generate Cedar case studies"
   &= program "cav2025-cedar-restrict-gclassroom-exe"
 

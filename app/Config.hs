@@ -2,6 +2,7 @@
 
 module Config where
 
+import Data.Function
 import System.Console.CmdArgs
 
 data Config =
@@ -27,6 +28,8 @@ data Config =
       , numAccts    :: Int
       , numProjs    :: Int
       , maxProjSize :: Int
+
+      , exercisedOverprivilege :: Int
 
       , seed        :: Int
       , entityStore :: FilePath
@@ -72,16 +75,19 @@ gclass = GC
   } &= help "Generate Cedar classroom case study"
 
 projman = PM
-  { numDevs = 50
+  { numDevs     = 50
   , numPlanners = 20
-  , numPMs = 15
-  , numAccts = 15
-  , numProjs = 10
+  , numPMs      = 15
+  , numAccts    = 15
+  , numProjs    = 10
   , maxProjSize = 20
-  , seed = 2025
+  , seed        = 2025
+
+  , exercisedOverprivilege = 0 &= help "Percentage of exercised overprivileges (Default: 0)"
+
   , entityStore = "./assets/project-management/entities.json" &= typFile
   , policyStore = "./assets/project-management/policies.cedar" &= typFile
-  , logs = "./assets/project-management/logs.json" &= typFile
+  , logs        = "./assets/project-management/logs.json" &= typFile
   } &= help "Generate Cedar project management case study"
 
 hotcrp = HC
@@ -104,3 +110,14 @@ conf =
   &= summary "Generate Cedar case studies"
   &= program "cav2025-cedar-restrict-gclassroom-exe"
 
+numExercisedOverPriv :: Int -> Int -> Int
+numExercisedOverPriv totOk percEOP =
+  ((totOk & fromIntegral) * proportionAdditional) & floor
+  where
+    percEOPSafe = percEOP & max 0 & min 100
+
+    percOk :: Double
+    percOk = (100 - percEOPSafe) & fromIntegral
+
+    proportionAdditional :: Double
+    proportionAdditional = (100.0 / percOk) - 1.0

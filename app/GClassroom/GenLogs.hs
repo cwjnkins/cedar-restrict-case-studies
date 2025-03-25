@@ -133,7 +133,9 @@ createEventLog conf@GC{..} gc@GClassroom{..} = do
   if exercisedOverprivilegeSafe conf == 0 then
     return ret
   else do
-    let numEOPByPolicy = okReqsByPolicy & map numExercisedOverPriv
+    let numEOPByPolicy =
+          okReqsByPolicy
+          & map (\ reqs -> numExercisedOverPriv (length reqs) exercisedOverprivilege)
     eops <-
         numEOPByPolicy
       & zipWith ($)
@@ -194,13 +196,13 @@ createEventLog conf@GC{..} gc@GClassroom{..} = do
         replicateM num (dViewGrades__StudentStudent gc)
       return $ pVGStudent ++ dVGStudent
 
-    numExercisedOverPriv :: [Request'] -> Int
-    numExercisedOverPriv reqs = (reqNum * proportionAdditional) & floor
-      where
-      reqNum = reqs & length & fromIntegral
-      okPercent = ((100 - exercisedOverprivilegeSafe conf) & fromIntegral)
-      proportionAdditional :: Double
-      proportionAdditional = (100.0 / okPercent) - 1.0
+    -- numExercisedOverPriv :: [Request'] -> Int
+    -- numExercisedOverPriv reqs = (reqNum * proportionAdditional) & floor
+    --   where
+    --   reqNum = reqs & length & fromIntegral
+    --   okPercent = ((100 - exercisedOverprivilegeSafe conf) & fromIntegral)
+    --   proportionAdditional :: Double
+    --   proportionAdditional = (100.0 / okPercent) - 1.0
 
     eopPostAssign :: RandomGen g => State g Request'
     eopPostAssign = eopPostNextAssignment gc

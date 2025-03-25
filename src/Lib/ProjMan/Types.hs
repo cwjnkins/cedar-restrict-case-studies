@@ -71,7 +71,7 @@ data PMAction =
   | EditAssets
   | ViewCalendar
   | EditCalendar
-  deriving Show
+  deriving (Show, Eq, Ord)
 
 toAction :: PMAction -> Action
 toAction act = Action . show $ act

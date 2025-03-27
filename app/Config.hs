@@ -63,15 +63,15 @@ gclass = GC
   , exercisedOverprivilege = 0 &= help "Percentage of exercised overprivileges (Default: 0)"
 
   , seed                  = 2025
-  , entityStore           =    "./assets/gclassroom/entities.json"
+  , entityStore           =    "./assets/GClassroom/entities.json"
                             &= typFile
-                            &= help "(Default: ./assets/gclassroom/entities.json)"
-  , policyStore           =    "./assets/gclassroom/policies.cedar"
+                            &= help "(Default: ./assets/GClassroom/entities.json)"
+  , policyStore           =    "./assets/GClassroom/policies.cedar"
                             &= typFile
-                            &= help "(Default: ./assets/gclassroom/policies.cedar)"
-  , logs                  =    "./assets/gclassroom/logs.json"
+                            &= help "(Default: ./assets/GClassroom/policies.cedar)"
+  , logs                  =    "./assets/GClassroom/logs.json"
                             &= typFile
-                            &= help "(Default: ./assets/gclassroom/logs.json)"
+                            &= help "(Default: ./assets/GClassroom/logs.json)"
   } &= help "Generate Cedar classroom case study"
 
 projman = PM

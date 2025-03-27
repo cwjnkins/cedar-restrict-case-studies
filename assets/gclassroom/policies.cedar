@@ -2,9 +2,9 @@
 // tightening: only when not isTA
 permit
   ( principal
-  , action == Action::"PostNextAssignment"
+  , action == Action::"PostAssignment"
   , resource )
-  when { principal in resource };
+  when { principal in resource.course };
 
 // editing assignments
 // tightening: only when not isTA
@@ -17,34 +17,20 @@ permit
 // grading assignments
 permit
   ( principal
-  , action == Action::"GradeSubmission"
+  , action == Action::"PostGrade"
   , resource )
-  when { principal in resource.course };
+  when { principal in resource.assignment.course };
 
 // viewing grades: staff
 // tightening: only staff in the course can view
 permit
   ( principal is Staff
-  , action == Action::"ViewGrades"
-  , resource is Assignment );
+  , action == Action::"ViewGrade"
+  , resource is Grade );
 
 // viewing grades
 permit
   ( principal is Student
-  , action == Action::"ViewGrades"
-  , resource is Student )
-  when { principal == resource };
-
-// permit
-//   ( principal is Staff
-//   , action == Action::"ViewGrades"
-//   , resource )
-//   when {    principal in context.course
-//          && resource in context.course.students };
-
-// permit
-//   ( principal is Student
-//   , action == Action::"ViewGrades"
-//   , resource )
-//   when { principal == resource };
-
+  , action == Action::"ViewGrade"
+  , resource is Grade )
+  when { principal == resource.student };

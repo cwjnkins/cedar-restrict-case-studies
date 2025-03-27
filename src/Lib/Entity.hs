@@ -48,3 +48,6 @@ modifyAtUID u f (e:es)
 
 addParent :: UID -> Entity a -> Entity a
 addParent u e = e { parents = u : parents e }
+
+entityElem :: Entity a -> [UID] -> Bool
+entityElem e uids = (e & uid) `elem` uids

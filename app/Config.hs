@@ -9,7 +9,7 @@ data Config =
     GC
       { numStudents           :: Int
       , numCourses            :: Int
-      , maxClassSize          :: Int
+      , maxCourseLoad         :: Int
       , numAdditionalTeachers :: Int
       , numTAs                :: Int
       , maxCourseAssignments  :: Int
@@ -55,7 +55,7 @@ data Config =
 gclass = GC
   { numStudents           = 100 &= help "(Default: 100)"
   , numCourses            = 10  &= help "(Default: 10)"
-  , maxClassSize          = 15  &= help "(Default: 15)"
+  , maxCourseLoad         = 5   &= help "(Default: 5)"
   , numAdditionalTeachers = 9   &= help "(Default: 9)"
   , numTAs                = 6   &= help "(Default: 6)"
   , maxCourseAssignments  = 5   &= help "(Default: 5)"

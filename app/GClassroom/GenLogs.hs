@@ -16,199 +16,184 @@ exercisedOverprivilegeSafe :: Config -> Int
 exercisedOverprivilegeSafe GC{..} =
   exercisedOverprivilege & max 0 & min 100
 
-pPostNextAssignment :: GClassroom -> Assignment -> Request'
-pPostNextAssignment gc assign =
-  let course = getCourse gc assign in
-  let teacher = getTeacher gc course in
-  mkRequest' teacher (toAction PostNextAssignment) course
+pPostAssignment :: GClassroom -> Assignment -> Request'
+pPostAssignment gc assign =
+  let teacher = assign & getTeacher gc in
+  postAssignment teacher assign
 
-dPostNextAssignment :: RandomGen g => GClassroom -> Assignment -> State g Request'
-dPostNextAssignment gc assign = do
-  let c = getCourse gc assign
-  s <- randomElem (getStudents gc c)
-  return $ mkRequest' s (toAction PostNextAssignment) c
-
-eopPostNextAssignment :: RandomGen g => GClassroom -> State g Request'
-eopPostNextAssignment gc@GClassroom{..} = do
+eopPostAssignment :: RandomGen g => GClassroom -> State g Request'
+eopPostAssignment gc@GClassroom{..} = do
   ta <- randomElem tas
-  course <- ta & getStaffCourses gc & randomElem
-  return $ PostNextAssignment & toAction & toRequest' ta course
+  course <- randomElem (ta & getCourses gc)
+  assignment <- randomElem (course & getAssignments gc)
+  return $ postAssignment ta assignment
 
 pEditAssignment :: GClassroom -> Assignment -> Request'
 pEditAssignment gc assign =
-  let c = getCourse gc assign
-      t = getTeacher gc c
+  let c = assign & getCourse gc
+      t = c & getTeacher gc
   in
-  mkRequest' t (toAction EditAssignment) assign
+  editAssignment t assign
 
-dEditAssignment :: RandomGen g => GClassroom -> Assignment -> State g Request'
-dEditAssignment gc assign = do
-  let c = getCourse gc assign
-  s <- randomElem (getStudents gc c)
-  return $ mkRequest' s (toAction EditAssignment) assign
+-- dEditAssignment :: RandomGen g => GClassroom -> Assignment -> State g Request'
+-- dEditAssignment gc assign = do
+--   let c = getCourse gc assign
+--   s <- randomElem (getStudents gc c)
+--   return $ mkRequest' s (toAction EditAssignment) assign
 
 eopEditAssignment :: RandomGen g => GClassroom -> State g Request'
 eopEditAssignment gc@GClassroom{..} = do
   ta <- randomElem tas
-  course <- ta & getStaffCourses gc & randomElem
-  assign <- course & getCourseAssignments gc & randomElem
-  return $ EditAssignment & toAction & toRequest' ta assign
+  course <- randomElem (ta & getCourses gc) -- ta & getStaffCourses gc & randomElem
+  assign <- randomElem (course & getAssignments gc)
+  return $ editAssignment ta assign
 
-pGradeSubmission :: RandomGen g => GClassroom -> Assignment -> State g [Request']
-pGradeSubmission gc assign = do
-  let c = getCourse gc assign
-  let (t, assists) = getCourseStaff gc c
-  let r1 = mkRequest' t (toAction GradeSubmission) assign
-  tasGrading <- do
-    numGrading <- state $ randomR (0, length assists - 1)
-    take numGrading <$> uniformShuffleList assists
-  let rs =
-          tasGrading
-        & map (\ ta -> mkRequest' ta (toAction GradeSubmission) assign)
-  return (r1 : rs)
+-- All grades will have a permitted post request, but the principal (course
+-- staff) are randomly selected
+pPostGrades :: RandomGen g => GClassroom -> Assignment -> State g [Request']
+pPostGrades gc assign = do
+  let c = assign & getCourse gc
+  let staff@(teach:tas) = c & getStaff gc
+  let grades = assign & getGrades gc
+  forM grades
+    (\ gr -> do
+       principal <- randomElem staff
+       return $ postGrade principal gr)
 
-dGradeSubmission :: RandomGen g => GClassroom -> Assignment -> State g Request'
-dGradeSubmission gc assign = do
-  let c = getCourse gc assign
-  s <- randomElem (getStudents gc c)
-  return $ mkRequest' s (toAction GradeSubmission) assign
+-- -- For a given assignment, some students (for the course associated with the
+-- -- assignment) try to post their own grades -- these are denied (by
+-- -- default-deny)
+-- dPostGrade :: RandomGen g => GClassroom -> Assignment -> State g Request'
+-- dPostGrade gc assign = do
+--   let c = assign & getCourse gc
+--   s <- randomElem (c & getStudents gc)
+--   let g = findGrade gc assign s
+--   return $ PostGrade & toAction & toRequest' s g
 
-pViewGrades__StaffAssignment
-  :: GClassroom -> Assignment -> [Request']
-pViewGrades__StaffAssignment gc assign =
-  let
-    c = getCourse gc assign
-    (t, assists) = getCourseStaff gc c
-  in
-  (  (t : assists)
-   & map (\ p -> mkRequest' p (toAction ViewGrades) assign))
+-- there are no over-privileges to exercise for posting grades
 
-eopViewGrades__StaffAssignment :: RandomGen g => GClassroom -> State g Request'
-eopViewGrades__StaffAssignment gc@GClassroom{..} = do
-  (staff, cs) <-
-      gc
-    & getAllStaff
-    & map (\staff -> (staff, courses & filter (notStaffForCourse staff)))
-    & filter (\ (staff, cs) -> length cs /= 0)
-    & randomElem
+
+-- Viewing grades: after an assignment is released, a random student comes to
+-- the office hours of a random course staff member, leading to the staff member
+-- viewing the student's grade
+pViewGrade__Staff :: RandomGen g => GClassroom -> Assignment -> State g Request'
+pViewGrade__Staff gc assign = do
+  let c = assign & getCourse gc
+  stud <- randomElem (c & getStudents gc)
+  staffMember <- randomElem (c & getStaff gc)
+  let gr = findGrade gc assign stud
+  return $ staffViewGrade staffMember gr
+
+-- EOP: some staff request to view a grade for an assignment that is not for a
+-- course they're teaching
+eopViewGrade__Staff :: RandomGen g => GClassroom -> State g Request'
+eopViewGrade__Staff gc@GClassroom{..} = do
+  let eopPrincipals :: [(Staff, [Course])] =
+        gc
+        & getAllStaff
+        & map (\ staf -> (staf, courses & filter (notInCourse staf)))
+        & filter (\ (_, cs) -> length cs > 0)
+  (eopPrincipal, cs) <- randomElem eopPrincipals
   c <- randomElem cs
-  assign <- c & getCourseAssignments gc & randomElem
-  return $ ViewGrades & toAction & toRequest' staff assign
+  gr <- randomElem (c & getGrades gc)
+  return $ staffViewGrade eopPrincipal gr
   where
-    notStaffForCourse :: Staff -> Course -> Bool
-    notStaffForCourse s c = (c & uid) `notElem` (s & parents)
+    notInCourse :: Staff -> Course -> Bool
+    notInCourse s c =
+      (s & uid) `notElem` (c & getStaff gc & map uid)
 
-dViewGrades__StudentAssignment
-  :: RandomGen g => GClassroom -> Assignment -> State g Request'
-dViewGrades__StudentAssignment gc assign = do
-  let c = getCourse gc assign
-  s <- randomElem (getStudents gc c)
-  return $ mkRequest' s (toAction ViewGrades) assign
+-- dViewGrades__StudentAssignment
+--   :: RandomGen g => GClassroom -> Assignment -> State g Request'
+-- dViewGrades__StudentAssignment gc assign = do
+--   let c = getCourse gc assign
+--   s <- randomElem (getStudents gc c)
+--   return $ mkRequest' s (toAction ViewGrades) assign
 
-pViewGrades__StudentStudent
-  :: RandomGen g => GClassroom -> State g Request'
-pViewGrades__StudentStudent GClassroom{..} = do
-  s <- randomElem students
-  return $ mkRequest' s (toAction ViewGrades) s
+pViewGrades__Student :: RandomGen g => GClassroom -> Assignment -> State g Request'
+pViewGrades__Student gc@GClassroom{..} assign = do
+  let studs = assign & getStudents gc
+  stud <- randomElem studs
+  let gr = findGrade gc assign stud
+  return $ studentViewGrade stud gr
 
-dViewGrades__StudentStudent
-  :: RandomGen g => GClassroom -> State g Request'
-dViewGrades__StudentStudent GClassroom{..} = do
-  s1 <- randomElem students
-  s2 <- students & filter (\s -> uid s /= uid s1) & randomElem
-  return $ mkRequest' s1 (toAction ViewGrades) s2
+-- dViewGrades__StudentStudent
+--   :: RandomGen g => GClassroom -> State g Request'
+-- dViewGrades__StudentStudent GClassroom{..} = do
+--   s1 <- randomElem students
+--   s2 <- students & filter (\s -> uid s /= uid s1) & randomElem
+--   return $ mkRequest' s1 (toAction ViewGrades) s2
 
 createEventLog :: RandomGen g => Config -> GClassroom -> State g [Request']
 createEventLog conf@GC{..} gc@GClassroom{..} = do
   okReqs :: [[[Request']]] <- do
-    forM assignments (\ assign -> do
-      posts <- postAssignReqs assign
-      edits <- editAssignReqs assign
-      grades <- gradeSubmissionReqs assign
-      staffViews <- staffViewGradeReqs assign
-      studViews <- studViewGradeReqs
-      return $ posts:edits:grades:staffViews:[studViews])
+    forM assignments
+      (\ assign -> do
+          let post = pPostAssignment gc assign
+          edits <- editAssignReqs assign
+          grades <- gradeAssignment assign
+          staffViews <- staffViewGrades assign
+          studViews <- studViewGrades assign
+          return $ [post]:edits:grades:staffViews:[studViews])
+
   let okReqsByPolicy = okReqs & foldl1 (zipWith (++))
-  let ret = concat okReqsByPolicy
-  if exercisedOverprivilegeSafe conf == 0 then
-    return ret
-  else do
+  if exercisedOverprivilegeSafe conf == 0
+    then return $ okReqsByPolicy & concat
+    else do
     let numEOPByPolicy =
           okReqsByPolicy
-          & map (\ reqs -> numExercisedOverPriv (length reqs) exercisedOverprivilege)
+          & map (\reqs -> numExercisedOverPriv (length reqs) (exercisedOverprivilegeSafe conf))
     eops <-
-        numEOPByPolicy
+      numEOPByPolicy
       & zipWith ($)
-          [ flip replicateM eopPostAssign  -- TA posts an assignment
-          , flip replicateM eopEditAssign  -- TA edits an assignment
-          , const (return [])              -- no overprivileges
-          , flip replicateM eopStaffVG     -- staff views grades of assignment for course they're not staff of
-          , const (return [])              -- no overprivileges
+          [ flip replicateM eopPostAssign -- TA posts an assignment
+          , flip replicateM eopEditAssign -- TA edits an assignment
+          , const (return [])             -- no overprivileges
+          , flip replicateM eopStaffVG    -- staff not-of-course views grade
+          , const (return [])             -- no overprivileges
           ]
       & sequence
-    return $ ret ++ (eops & concat)
-  where
-    studentUnauthRequestDistPerCourse =
-        [1..maxClassSize]
-      & map (`div` 3)
-      & (1:)
+    return $
+      okReqsByPolicy
+      & zipWith (++) eops
+      & concat
 
+  where
+    -- approx. 1 in 4 assignments need updating after posting (not counting EOPs)
     assignmentNeedsUpdatingDist :: [Int]
     assignmentNeedsUpdatingDist = [0,0,0,1]
 
-    postAssignReqs :: RandomGen g => Assignment -> State g [Request']
-    postAssignReqs assign = do
-      studAttempts :: [Request'] <- do
-        num <- randomElem studentUnauthRequestDistPerCourse
-        replicateM num (dPostNextAssignment gc assign)
-      return $ pPostNextAssignment gc assign : studAttempts
-
+    -- returns either empty or single-element list
     editAssignReqs :: RandomGen g => Assignment -> State g [Request']
     editAssignReqs assign = do
-      studAttempts :: [Request'] <- do
-        num <- randomElem studentUnauthRequestDistPerCourse
-        replicateM num (dEditAssignment gc assign)
-      teachEdit :: [Request'] <- do
-        num <- randomElem assignmentNeedsUpdatingDist
-        return . replicate num $ pEditAssignment gc assign
-      uniformShuffleList $ teachEdit ++ studAttempts
+      num <- randomElem assignmentNeedsUpdatingDist
+      return $ replicate num (pEditAssignment gc assign)
 
-    gradeSubmissionReqs :: RandomGen g => Assignment -> State g [Request']
-    gradeSubmissionReqs assign = do
-      studAttempts :: [Request'] <- do
-        num <- randomElem studentUnauthRequestDistPerCourse
-        replicateM num (dGradeSubmission gc assign)
-      staffReqs <- pGradeSubmission gc assign
-      uniformShuffleList (staffReqs ++ studAttempts)
+    -- for each assignment, grades for all students are posted
+    gradeAssignment :: RandomGen g => Assignment -> State g [Request']
+    gradeAssignment assign = pPostGrades gc assign
 
-    staffViewGradeReqs :: RandomGen g => Assignment -> State g [Request']
-    staffViewGradeReqs assign = do
-      let pVGStaff = pViewGrades__StaffAssignment gc assign
-      return pVGStaff
+    -- a random number of visits during office hours, up to a third of the
+    -- enrollment size (but possibly with repeating student visits)
+    staffViewGrades :: RandomGen g => Assignment -> State g [Request']
+    staffViewGrades assign = do
+      let studs = assign & getStudents gc
+      num <- state $ randomR (0, length studs `div` 3)
+      replicateM num $
+        pViewGrade__Staff gc assign
 
-    studViewGradeReqs :: RandomGen g => State g [Request']
-    studViewGradeReqs = do
-      pVGStudent :: [Request'] <- do
-        num <- randomElem [1..maxClassSize]
-        replicateM num (pViewGrades__StudentStudent gc)
-      dVGStudent :: [Request'] <- do
-        num <- randomElem studentUnauthRequestDistPerCourse
-        replicateM num (dViewGrades__StudentStudent gc)
-      return $ pVGStudent ++ dVGStudent
-
-    -- numExercisedOverPriv :: [Request'] -> Int
-    -- numExercisedOverPriv reqs = (reqNum * proportionAdditional) & floor
-    --   where
-    --   reqNum = reqs & length & fromIntegral
-    --   okPercent = ((100 - exercisedOverprivilegeSafe conf) & fromIntegral)
-    --   proportionAdditional :: Double
-    --   proportionAdditional = (100.0 / okPercent) - 1.0
+    -- similar to the above, but for students viewing their own grade
+    studViewGrades :: RandomGen g => Assignment -> State g [Request']
+    studViewGrades assign = do
+      let studs = assign & getCourse gc & getStudents gc
+      num <- state $ randomR (0, length studs `div` 3)
+      replicateM num $
+        pViewGrades__Student gc assign
 
     eopPostAssign :: RandomGen g => State g Request'
-    eopPostAssign = eopPostNextAssignment gc
+    eopPostAssign = eopPostAssignment gc
 
     eopEditAssign :: RandomGen g => State g Request'
     eopEditAssign = eopEditAssignment gc
 
     eopStaffVG :: RandomGen g => State g Request'
-    eopStaffVG = eopViewGrades__StaffAssignment gc
+    eopStaffVG = eopViewGrade__Staff gc

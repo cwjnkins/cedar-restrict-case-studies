@@ -1,31 +1,29 @@
 {-# LANGUAGE DeriveGeneric, OverloadedStrings, RecordWildCards #-}
 module Lib.GClassroom.Types where
 
+import Data.Function
 import Data.Aeson
 import GHC.Generics
 
 import Lib.Action
 import Lib.Entity
+import Lib.Request
+
+type Course = Entity Value
+mkCourse :: String -> Course
+mkCourse name =
+  Entity (mkUID "Course" name) (object []) []
+
+-- getCourseEnrolled :: Course -> [UID]
+-- getCourseEnrolled Entity{..} = enrolled attrs
 
 type Student = Entity Value
-mkStudent :: String -> Student
-mkStudent name = Entity (mkUID "Student" name) (object []) []
-
-data CourseAttrs = CourseAttrs { enrolled :: [UID] }
-  deriving (Generic, Show)
-instance ToJSON CourseAttrs where
-  toJSON (CourseAttrs enrolled) =
-    object ["students" .= enrolled]
-
-type Course = Entity CourseAttrs
-mkCourse :: String -> [Student] -> Course
-mkCourse name studs =
-  let studUIDs = map uid studs in
-  Entity (mkUID "Course" name) (CourseAttrs studUIDs) []
-
-getCourseEnrolled :: Course -> [UID]
-getCourseEnrolled Entity{..} = enrolled attrs
-
+mkStudent :: String -> [Course] -> Student
+mkStudent name courses =
+  Entity
+    (mkUID "Student" name)
+    (object [])
+    (courses & map uid)
 
 data AssignmentAttrs = AssignmentAttrs { course :: UID }
   deriving (Generic, Show)
@@ -36,8 +34,22 @@ mkAssignment :: String -> Course -> Assignment
 mkAssignment name course =
   Entity (mkUID "Assignment" name) (AssignmentAttrs (uid course)) []
 
-getAssignmentCourse :: Assignment -> UID
-getAssignmentCourse Entity{..} = uid
+-- getAssignmentCourse :: Assignment -> UID
+-- getAssignmentCourse Entity{..} = uid
+
+data GradeAttrs =
+  GradeAttrs { student :: UID, gassignment :: UID }
+  deriving (Generic, Show)
+
+instance ToJSON GradeAttrs where
+  toJSON GradeAttrs{..} =
+    object ["student" .= student, "assignment" .= gassignment ]
+
+type Grade = Entity GradeAttrs
+mkGrade :: String -> Student -> Assignment -> Grade
+mkGrade name stud assign =
+  Entity (mkUID "Grade" name)
+    (GradeAttrs (stud & uid) (assign & uid)) []
 
 type Role = Entity Value
 mkRole :: String -> Role
@@ -68,21 +80,40 @@ data GClassroom = GClassroom
   { students    :: [Student]
   , courses     :: [Course]
   , assignments :: [Assignment]
+  , grades      :: [Grade]
   , tas         :: [Staff]
   , teachers    :: [Staff]
   }
 
 data GClassAction =
-    PostNextAssignment
+    PostAssignment
   | EditAssignment
-  | GradeSubmission
-  | ViewGrades
+  | PostGrade
+  | ViewGrade
+  deriving (Show)
 
 toAction :: GClassAction -> Action
-toAction PostNextAssignment = Action "PostNextAssignment"
-toAction EditAssignment = Action "EditAssignment"
-toAction GradeSubmission = Action "GradeSubmission"
-toAction ViewGrades = Action "ViewGrades"
+toAction = Action . show
+
+postAssignment :: Staff -> Assignment -> Request'
+postAssignment staf assign =
+  PostAssignment & toAction & toRequest' staf assign
+
+editAssignment :: Staff -> Assignment -> Request'
+editAssignment staf assign =
+  EditAssignment & toAction & toRequest' staf assign
+
+postGrade :: Staff -> Grade -> Request'
+postGrade staf gr =
+  PostGrade & toAction & toRequest' staf gr
+
+staffViewGrade :: Staff -> Grade -> Request'
+staffViewGrade staf gr =
+  ViewGrade & toAction & toRequest' staf gr
+
+studentViewGrade :: Student -> Grade -> Request'
+studentViewGrade stud gr =
+  ViewGrade & toAction & toRequest' stud gr
 
 data GClassEntity =
     GCCourse Course
@@ -90,18 +121,22 @@ data GClassEntity =
   | GCStaff Staff
   | GCStudent Student
   | GCAssignment Assignment
+  | GCGrade Grade
   deriving (Generic, Show)
+
 instance ToJSON GClassEntity where
   toJSON (GCCourse course) = toJSON course
   toJSON (GCRole role)     = toJSON role
   toJSON (GCStaff staff)   = toJSON staff
   toJSON (GCStudent stud)  = toJSON stud
   toJSON (GCAssignment assign) = toJSON assign
+  toJSON (GCGrade grade)   = toJSON grade
 
 toGClassEntities :: GClassroom -> [GClassEntity]
-toGClassEntities gc =
+toGClassEntities GClassroom{..} =
      map GCRole [roleTeacher, roleTA]
-  ++ map GCStudent (students gc)
-  ++ map GCStaff (teachers gc ++ tas gc)
-  ++ map GCCourse (courses gc)
-  ++ map GCAssignment (assignments gc)
+  ++ map GCStudent students
+  ++ map GCStaff (teachers ++ tas)
+  ++ map GCCourse courses
+  ++ map GCAssignment assignments
+  ++ map GCGrade grades

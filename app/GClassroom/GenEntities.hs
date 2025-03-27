@@ -6,6 +6,8 @@ import Control.Arrow
 import Control.Monad
 import Control.Monad.State.Strict
 import Data.Function
+import Data.List
+import Data.Maybe
 import System.Random
 
 import Lib
@@ -14,18 +16,23 @@ import Lib.Util
 
 import Config
 
-generateStudents :: Int -> [Student]
-generateStudents num =
-  map
-    (mkStudent . show)
-    [0..num-1]
+maxCourseLoadSafe :: Config -> Int
+maxCourseLoadSafe GC{..} =
+  maxCourseLoad
+  & max 0
+  & min numCourses
 
-generateCourses :: [[Student]] -> [Course]
-generateCourses studGroups =
-  zipWith
-    (\ cNo classBody ->
-       mkCourse (show cNo) classBody)
-    [0..(length studGroups - 1)] studGroups
+generateCourses :: Int -> [Course]
+generateCourses numCourses =
+  [0..numCourses-1] & map (mkCourse . show)
+
+generateStudents :: [[Course]] -> [Student]
+generateStudents courseLoads =
+  courseLoads
+  & zipWith
+      (\ studId courseLoad ->
+         mkStudent (show studId) courseLoad)
+      [0..(length courseLoads - 1)]
 
 generateAssignments :: [(Int,Course)] -> [Assignment]
 generateAssignments =
@@ -38,6 +45,25 @@ generateAssignments =
              >>> (++ ("C" ++ getEntityName forCourse))
              >>> ((flip mkAssignment) forCourse))
 
+generateGradesForAssignment :: [Course] -> [Student] -> Assignment -> [Grade]
+generateGradesForAssignment courses studs assign =
+  let course = assign & findAssignmentCourse courses
+      enrolled = course & findCourseStudents studs in
+  enrolled
+  & map (\ s -> mkGrade (fmtGId s) s assign)
+  where
+    fmtGId :: Student -> String
+    fmtGId stud =
+      "A"
+      ++ (assign & uid & __entity & _id)
+      ++ "_S"
+      ++ (stud & uid & __entity & _id)
+
+generateGrades :: [Assignment] -> [Course] -> [Student] -> [Grade]
+generateGrades assigns cours studs =
+  assigns
+  & concatMap (generateGradesForAssignment cours studs)
+
 generateStaff :: [[Course]] -> [[Course]] -> ([Staff], [Staff])
 generateStaff teacherWorkload taWorkload =
   let teachLen = length teacherWorkload in
@@ -49,36 +75,34 @@ generateStaff teacherWorkload taWorkload =
 
 randomGClassroom :: RandomGen g => Config -> State g GClassroom
 randomGClassroom GC{..} = do
-  let studs = generateStudents numStudents
-  courseSizes <- replicateM numCourses randomCourseSize
-  courses <- do
-    courseLoad <- mapM (randomCourseBody studs) courseSizes
-    return $ generateCourses courseLoad
+  let courses = generateCourses numCourses
+  studs <- do
+    courseLoad <- replicateM numStudents (randomCourseLoad courses)
+    return $ generateStudents courseLoad
   assignments <- randomAssignments courses
   (teachers, tas) <- do
     teacherWorkload <- randomTeacherWorkload courses
     taWorkload <- randomTAWorkload courses
     return $ generateStaff teacherWorkload taWorkload
+  let grades = generateGrades assignments courses studs
   return $ GClassroom
     { students = studs
     , courses  = courses
     , assignments = assignments
+    , grades = grades
     , tas = tas
     , teachers = teachers
     }
   where
-    realMaxClassSize = min maxClassSize numStudents
     realTeacherNum = numAdditionalTeachers+1
     realTANum = min numTAs numCourses
 
-    randomCourseSize :: RandomGen g => State g Int
-    randomCourseSize = state $
-      randomR (1, realMaxClassSize)
-
-    randomCourseBody :: RandomGen g => [Student] -> Int -> State g [Student]
-    randomCourseBody studs csize = do
-      shuff <- uniformShuffleList studs
-      return $ take csize shuff
+    -- course load for a single student
+    randomCourseLoad :: RandomGen g => [Course] -> State g [Course]
+    randomCourseLoad courses = do
+      shuff <- uniformShuffleList courses
+      load <- state $ randomR (1,maxCourseLoadSafe conf)
+      return $ shuff & take load
 
     randomAssignments :: RandomGen g => [Course] -> State g [Assignment]
     randomAssignments cs =

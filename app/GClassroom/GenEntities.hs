@@ -1,4 +1,4 @@
-{-# LANGUAGE RecordWildCards #-}
+{-# LANGUAGE RecordWildCards, ScopedTypeVariables, TupleSections #-}
 
 module GClassroom.GenEntities where
 
@@ -14,19 +14,55 @@ import Lib.Util
 
 import Config
 
+-- "Safe" parameters
+--------------------------------------------------
+numCoursesSafe :: Config -> Int
+numCoursesSafe GC{..} =
+  numCourses
+  & max 0
+
+numTeachersSafe :: Config -> Int
+numTeachersSafe GC{..} =
+  (1 + numAdditionalTeachers)
+  & max 1
+
+numTAsSafe :: Config -> Int
+numTAsSafe conf@GC{..} =
+  numTAs
+  & max 0
+  & min (conf & numCoursesSafe)
+
 maxCourseLoadSafe :: Config -> Int
 maxCourseLoadSafe GC{..} =
   maxCourseLoad
   & max 0
   & min numCourses
 
+maxCourseAssignmentsSafe :: Config -> Int
+maxCourseAssignmentsSafe GC{..} =
+  maxCourseAssignments
+  & max 1
+
+-- Entity generation
+--------------------------------------------------
+
 -- Deterministically create courses
 generateCourses :: Int -> [Course]
 generateCourses numCourses =
   [0..numCourses-1] & map (mkCourse . show)
 
--- Deterministically create students, given each of their courseloads
--- REQUIRES forall courseLoad `elem` courseLoads, nub courseLoad == courseLoad
+-- Randomly generate the courseload for a student.
+--
+-- The courses comprising the courseload are picked randomly (without
+-- replacement) from the `courses` parameter
+randomStudentCourseload :: RandomGen g => [Course] -> State g [Course]
+randomStudentCourseload courses = do
+  shuff <- uniformShuffleList courses
+  load <- state $ randomR (1, maxCourseLoadSafe conf)
+  return $ shuff & take load
+
+-- Create students from their courseloads
+--
 -- ENSURES length courseLoads == length (generateStudents courseLoads)
 generateStudents :: [[Course]] -> [Student]
 generateStudents courseLoads =
@@ -36,9 +72,65 @@ generateStudents courseLoads =
          mkStudent (show studId) courseLoad)
       [0..(length courseLoads - 1)]
 
--- Deterministically all assignments using a list of all courses, each tupled
--- with the number of assignments for the course
--- Example: the first assignment for the second course has id "C1A0"
+-- `randomStudents numStuds courses` randomgly generates `numStuds` students
+-- with courseloads pulled randomly (without replacement) from `courses`
+randomStudents :: RandomGen g => Int -> [Course] -> State g [Student]
+randomStudents numStuds courses =
+  generateStudents <$> replicateM numStuds (randomStudentCourseload courses)
+
+-- Randomly generate courseloads for ever teacher.
+--
+-- NOTE: The invariant is that each course has precisely one teacher; a teacher
+-- may have any number of courses (including 0)
+randomTeacherCourseloads :: RandomGen g => Int -> [Course] -> State g [[Course]]
+randomTeacherCourseloads numTeachers courses = do
+  -- NOTE: A teacher might not have any courses
+  assocTeachCourse :: [(Int,Course)] <-
+    forM courses (\ c -> (, c) <$> randomTeacherId)
+  return [courseload assocTeachCourse i | i <- [1..numTeachers-1]]
+  where
+    randomTeacherId :: RandomGen g => State g Int
+    randomTeacherId = state $ randomR (0, numTeachers - 1)
+
+    -- Given the teacher courseload (as pairs of teacher ids with a course),
+    -- find all courses for the given teacher id
+    courseload :: [(Int, Course)] -> Int -> [Course]
+    courseload assoc idx =
+      assoc
+      & filter (\ (i,_) -> i == idx)
+      & map snd
+
+-- Randomly assign one course to one TA.
+--
+-- NOTE: The invariant is every TA has exactly one course, courses can have any
+-- number of TAs (including 0)
+randomTACourseloads :: RandomGen g => Int -> [Course] -> State g [Course]
+randomTACourseloads numTAs courses =
+  replicateM numTAs (randomElem courses)
+
+-- Generate all staff, given the teacher and ta workloads.
+--
+-- Staff are assigned ids sequentially, with TAs numbered following teachers
+generateStaff :: [[Course]] -> [[Course]] -> ([Staff], [Staff])
+generateStaff teacherWorkload taWorkload =
+  let teachLen = length teacherWorkload
+      taLen    = length taWorkload
+      teachIDs = ["TE" ++ show i | i <- [0..teachLen-1]]
+      taIDs    = ["TA" ++ show i | i <- [0..taLen-1]]
+  in
+  ( zipWith mkTeacher teachIDs teacherWorkload
+  , zipWith mkTA taIDs taWorkload )
+
+randomStaff :: RandomGen g => Int -> Int -> [Course] -> State g ([Staff], [Staff])
+randomStaff numTeach numTA courses = do
+  teachCLs <- randomTeacherCourseloads numTeach courses
+  taCLs    <- randomTACourseloads numTA courses
+  return $ generateStaff teachCLs (taCLs & map (:[]))
+
+-- Generate all assignments using a list of all courses, each
+-- tupled with the number of assignments for the course
+--
+-- UID Example: the first assignment for the second course has id "C1A0"
 generateAssignments :: [(Int,Course)] -> [Assignment]
 generateAssignments =
   concatMap genAssign
@@ -54,12 +146,28 @@ generateAssignments =
              in
              mkAssignment fullId forCourse)
 
+
+-- Randomly generate the number of assignments for a course
+randomNumAssignments :: RandomGen g => Config -> State g Int
+randomNumAssignments conf =
+  state $ randomR (1, conf & maxCourseAssignmentsSafe)
+
+-- Randomly generate assignments for each course, where the number of
+-- assignments generate is itself random.
+randomAssignments :: RandomGen g => Config -> [Course] -> State g [Assignment]
+randomAssignments conf courses = do
+  assocNumAssignsCourse :: [(Int, Course)] <-
+    forM courses
+      (\ c ->
+         (,c) <$> randomNumAssignments conf)
+  return $ generateAssignments assocNumAssignsCourse
+
 -- Deterministically generate the grade entities for a given assignment.
 --
 -- The number of grades generated is the number of students enrolled in course
 -- to which the assignment belongs. Note, the invariant we keep is that a grade
--- is uniquely determined by its fields (there are no two grade entities for the
--- same (student, assignment) pair)
+-- is uniquely determined by its fields (there are no two distinct grade
+-- entities for the same (student, assignment) pair)
 generateGradesForAssignment :: [Course] -> [Student] -> Assignment -> [Grade]
 generateGradesForAssignment courses studs assign =
   let course = assign & findAssignmentCourse courses
@@ -81,33 +189,14 @@ generateGrades assigns cours studs =
   assigns
   & concatMap (generateGradesForAssignment cours studs)
 
-
--- Deterministically generate all course staff, given the teacher and ta
--- workloads.
---
--- Staff are assigned ids sequentially, with TAs numbered following teachers
-generateStaff :: [[Course]] -> [[Course]] -> ([Staff], [Staff])
-generateStaff teacherWorkload taWorkload =
-  let teachLen = length teacherWorkload in
-  let taLen    = length taWorkload in
-  let teachIDs = map show [0..teachLen-1] in
-  let taIDs    = map show [teachLen..teachLen+taLen-1] in
-  ( zipWith mkTeacher teachIDs teacherWorkload
-  , zipWith mkTA taIDs taWorkload )
-
 -- Randomly generate a classroom
 randomGClassroom :: RandomGen g => Config -> State g GClassroom
-randomGClassroom GC{..} = do
+randomGClassroom conf@GC{..} = do
   let courses = generateCourses numCourses
-  studs <- do
-    -- randomly generate a course load `numStudents` times
-    courseLoad <- replicateM numStudents (randomCourseLoad courses)
-    return $ generateStudents courseLoad
-  assignments <- randomAssignments courses
-  (teachers, tas) <- do
-    teacherWorkload <- randomTeacherWorkload courses
-    taWorkload <- randomTAWorkload courses
-    return $ generateStaff teacherWorkload taWorkload
+  studs <- randomStudents numStudents courses
+  assignments <- randomAssignments conf courses
+  (teachers, tas) <-
+    randomStaff (conf & numTeachersSafe) (conf & numTAsSafe) courses
   let grades = generateGrades assignments courses studs
   return $ GClassroom
     { students = studs
@@ -117,48 +206,3 @@ randomGClassroom GC{..} = do
     , tas = tas
     , teachers = teachers
     }
-  where
-    realTeacherNum = numAdditionalTeachers+1
-    -- at most one TA for a course
-    realTANum = min numTAs numCourses
-
-    -- Randomly generate a single student course load.
-    -- - `load` is in the range (1, maxCourseLoad)
-    -- - the courses comprising the courseload are `load` distinct course
-    randomCourseLoad :: RandomGen g => [Course] -> State g [Course]
-    randomCourseLoad courses = do
-      shuff <- uniformShuffleList courses
-      load <- state $ randomR (1,maxCourseLoadSafe conf)
-      return $ shuff & take load
-
-    -- For each course, randomly generate some number of assignments (in the
-    -- range (1,maxCourseAssignments))
-    randomAssignments :: RandomGen g => [Course] -> State g [Assignment]
-    randomAssignments cs =
-          pure generateAssignments
-      <*> forM cs
-            (\ course -> do
-               numAssign <- state (randomR (1, maxCourseAssignments))
-               return (numAssign, course))
-
-    -- Teachers can have more than one course, but courses have exactly one
-    -- teacher. So, iterate through all courses and assign each randomly to a
-    -- teacher (represented as a list of course loads)
-    randomTeacherWorkload :: RandomGen g => [Course] -> State g [[Course]]
-    randomTeacherWorkload = loop (replicate realTeacherNum [])
-      where
-      loop :: RandomGen g => [[Course]] -> [Course] -> State g [[Course]]
-      loop accum [] = return accum
-      loop accum (c:cs) = do
-        teacherIdx <- state (randomR (0, realTeacherNum-1))
-        let accum' = modifyAt accum teacherIdx (c :)
-        loop accum' cs
-
-    -- TAs have precisely one course, and each course has at most one TA. So,
-    -- shuffle the full list of courses and take the `realTANum` prefix as the
-    -- TA workloads
-    randomTAWorkload :: RandomGen g => [Course] -> State g [[Course]]
-    randomTAWorkload cs = do
-      shuff <- uniformShuffleList (map (:[]) cs)
-      return $ take realTANum shuff
-

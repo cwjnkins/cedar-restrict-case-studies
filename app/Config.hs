@@ -5,6 +5,24 @@ module Config where
 import Data.Function
 import System.Console.CmdArgs
 
+defaultDist :: FilePath
+defaultDist = "./dist/"
+
+defaultAssets :: FilePath
+defaultAssets = "./assets/"
+
+defaultSchema :: FilePath
+defaultSchema = "schema.cedarschema"
+
+defaultPolicies :: FilePath
+defaultPolicies = "policies.cedar"
+
+defaultLogs :: FilePath
+defaultLogs = "logs.json"
+
+defaultStore :: FilePath
+defaultStore = "entities.json"
+
 data Config =
     GC
       { numStudents           :: Int
@@ -85,7 +103,7 @@ projman = PM
 
   , exercisedOverprivilege = 0 &= help "Percentage of exercised overprivileges (Default: 0)"
 
-  , entityStore = "./assets/project-management/entities.json" &= typFile
+  , entityStore = (defaultDist ++ "ProjMan/" ++ defaultStore) -- "./assets/project-management/entities.json" &= typFile
   , policyStore = "./assets/project-management/policies.cedar" &= typFile
   , logs        = "./assets/project-management/logs.json" &= typFile
   } &= help "Generate Cedar project management case study"

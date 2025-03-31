@@ -64,6 +64,7 @@ executable cav2025-cedar-restrict-gclassroom-exe
   main-is: Main.hs
   other-modules:
       Config
+      GClassroom.Config
       GClassroom.GenEntities
       GClassroom.GenLogs
       HotCRP.GenEntities

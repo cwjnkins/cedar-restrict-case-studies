@@ -13,53 +13,74 @@ import Lib.GClassroom
 import Lib.Util
 
 import Config
-
--- "Safe" parameters
---------------------------------------------------
-numCoursesSafe :: Config -> Int
-numCoursesSafe GC{..} =
-  numCourses
-  & max 0
-
-numTeachersSafe :: Config -> Int
-numTeachersSafe GC{..} =
-  (1 + numAdditionalTeachers)
-  & max 1
-
-numTAsSafe :: Config -> Int
-numTAsSafe conf@GC{..} =
-  numTAs
-  & max 0
-  & min (conf & numCoursesSafe)
-
-maxCourseLoadSafe :: Config -> Int
-maxCourseLoadSafe GC{..} =
-  maxCourseLoad
-  & max 0
-  & min numCourses
-
-maxCourseAssignmentsSafe :: Config -> Int
-maxCourseAssignmentsSafe GC{..} =
-  maxCourseAssignments
-  & max 1
+import GClassroom.Config
 
 -- Entity generation
 --------------------------------------------------
 
--- Deterministically create courses
-generateCourses :: Int -> [Course]
-generateCourses numCourses =
-  [0..numCourses-1] & map (mkCourse . show)
+-- aliases for readability
+type PreStudent = Int
+type PreTeacher = Int
+type PreTA      = Int
+
+type CourseCatalog = [Course] -- all courses
+type CourseLoad    = [Course] -- courses of a student/teacher/ta
+
+generatePreStudents :: Config -> Family [PreStudent]
+generatePreStudents conf =
+  [ [0..f-1]
+  | f <- conf & numStudents ]
+
+generatePreTeachers :: Config -> Family [PreTeacher]
+generatePreTeachers conf =
+  [ [0..f-1]
+  | f <- conf & numTeachers ]
+
+generatePreTAs :: Config -> Family [PreTA]
+generatePreTAs conf =
+  [ [0..f-1]
+  | f <- conf & numTAs ]
+
+-- Generate the course catalog together with teachers
+randomCourseCatalogWithStaff
+  :: RandomGen g => Config -> Family [PreTeacher]
+     -> Family (State g (CourseCatalog,[Staff]))
+randomCourseCatalogWithStaff conf teachersFam =
+  [ catalog teachers
+  | teachers <- teachersFam ]
+  where
+    courseload :: RandomGen g => State g Int
+    courseload = state $ randomR (1, conf & maxTeacherCourseload)
+
+    create :: (PreTeacher, Int) -> (Staff,CourseLoad)
+    create (teach,numCourses) =
+      let teacherCourses :: CourseLoad =
+            [ mkCourse ("T" ++ show teach ++ "C" ++ show cno)
+            | cno <- [0..numCourses-1] ]
+      in
+      (mkTeacher (show teach) teacherCourses , teacherCourses)
+
+    catalog :: RandomGen g => [PreTeacher] -> State g (CourseCatalog,[Staff])
+    catalog teachers = do
+      assocTeachCourseload :: [(Staff, CourseLoad)] <-
+        forM teachers (\ t -> (t,) <$> courseload)
+        & fmap (map create)
+      return $
+        ( assocTeachCourseload & concatMap snd
+        , assocTeachCourseload & map fst)
 
 -- Randomly generate the courseload for a student.
 --
 -- The courses comprising the courseload are picked randomly (without
 -- replacement) from the `courses` parameter
-randomStudentCourseload :: RandomGen g => [Course] -> State g [Course]
-randomStudentCourseload courses = do
-  shuff <- uniformShuffleList courses
-  load <- state $ randomR (1, maxCourseLoadSafe conf)
-  return $ shuff & take load
+randomStudentCourseload
+  :: RandomGen g => Family CourseCatalog -> Family (State g)
+
+-- randomStudentCourseload :: RandomGen g => [Course] -> State g [Course]
+-- randomStudentCourseload courses = do
+--   shuff <- uniformShuffleList courses
+--   load <- state $ randomR (1, maxCourseLoadSafe conf)
+--   return $ shuff & take load
 
 -- Create students from their courseloads
 --

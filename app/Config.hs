@@ -1,8 +1,10 @@
-{-# LANGUAGE DeriveDataTypeable #-}
+{-# LANGUAGE DeriveDataTypeable, RecordWildCards #-}
 
 module Config where
 
+import Control.Monad.State.Strict
 import Data.Function
+import Data.List
 import System.Console.CmdArgs
 
 defaultDist :: FilePath
@@ -23,16 +25,27 @@ defaultLogs = "logs.json"
 defaultStore :: FilePath
 defaultStore = "entities.json"
 
+type Family a = [a]
+
+stateFamily :: Family (State s a) -> State s (Family a)
+stateFamily fam = StateT $ \ s ->
+  let comps = [ runState comp s | comp <- fam ] in
+  pure (comps & map fst, comps & last & snd)
+
 data Config =
     GC
-      { numStudents           :: Int
-      , numCourses            :: Int
-      , maxCourseLoad         :: Int
-      , numAdditionalTeachers :: Int
-      , numTAs                :: Int
-      , maxCourseAssignments  :: Int
+      { size :: Family Int
+      -- proportion to `size`
+      , student_ratio :: Double
+      , teacher_ratio :: Double
+      , ta_ratio      :: Double
 
-      , exercisedOverprivilege :: Int
+      -- constant factors
+      , max_assignments_per_course :: Int
+      , max_student_courseload     :: Int
+      , max_teacher_courseload     :: Int
+
+      , eop :: Int
 
       , seed                  :: Int
       , entityStore           :: FilePath
@@ -71,25 +84,23 @@ data Config =
   deriving (Show, Data, Typeable)
 
 gclass = GC
-  { numStudents           = 100 &= help "(Default: 100)"
-  , numCourses            = 10  &= help "(Default: 10)"
-  , maxCourseLoad         = 5   &= help "(Default: 5)"
-  , numAdditionalTeachers = 9   &= help "(Default: 9)"
-  , numTAs                = 6   &= help "(Default: 6)"
-  , maxCourseAssignments  = 5   &= help "(Default: 5)"
+  { student_ratio = 1.0 &= help "Student body to `size` ratio"
+  , teacher_ratio = 0.1 &= help "Teacher to `size` ratio"
+  , ta_ratio      = 0.1 &= help "TA to `size` ratio"
 
-  , exercisedOverprivilege = 0 &= help "Percentage of exercised overprivileges (Default: 0)"
+  , max_assignments_per_course = 3
+  , max_student_courseload     = 5 &= help "Max courses in which a student enrolls"
+  , max_teacher_courseload     = 2 &= help "Max courses run by a teacher"
+
+  , eop = 0 &= help "Percentage of exercised overprivileges (Default: 0)"
 
   , seed                  = 2025
-  , entityStore           =    "./assets/GClassroom/entities.json"
+  , entityStore           =    (defaultDist ++ "GClassroom/" ++ defaultStore)
                             &= typFile
-                            &= help "(Default: ./assets/GClassroom/entities.json)"
-  , policyStore           =    "./assets/GClassroom/policies.cedar"
+  , policyStore           =    (defaultAssets ++ "GClassroom/" ++ defaultPolicies)
                             &= typFile
-                            &= help "(Default: ./assets/GClassroom/policies.cedar)"
-  , logs                  =    "./assets/GClassroom/logs.json"
+  , logs                  =    (defaultAssets ++ "GClassroom/" ++ defaultLogs)
                             &= typFile
-                            &= help "(Default: ./assets/GClassroom/logs.json)"
   } &= help "Generate Cedar classroom case study"
 
 projman = PM
@@ -139,3 +150,8 @@ numExercisedOverPriv totOk percEOP =
 
     proportionAdditional :: Double
     proportionAdditional = (100.0 / percOk) - 1.0
+
+preprocess :: Config -> Config
+preprocess conf@GC{..} =
+  conf { size = size & map (max 1) & sort & nub }
+preprocess conf = conf

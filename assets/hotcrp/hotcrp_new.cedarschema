@@ -1,4 +1,4 @@
-entity User {isPCChair: Bool, areaChair?: Area, pcMember?: Area};
+entity User {isPCChair: Bool, isAreaChair: Bool, pcMember?: Area};
 entity Area;
 entity Paper {authors: Set<User>, reviewers: Set<User>, area: Area};
 entity Review {ofPaper: Paper, author: User, isMetaReview: Bool};

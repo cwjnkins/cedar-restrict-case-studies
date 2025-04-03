@@ -5,12 +5,12 @@
 ### Terminology
 **Families of datasets**
 Case studies are generated as "families", which are sets of related entity
-stores and logs, to faciliate the evaluation of how well Restrictor scales. Each
+stores and logs, to facilitate the evaluation of how well Restrictor scales. Each
 member of a family is associated with a size. At a first approximation, for two
 members `m1` and `m2` of the same family such that the size of `m1` < size of
 `m2`, every entity appearing in the store for `m1` appears in the store for
 `m2`, and every log entry appearing in the log for `m1` appears in the log of
-`m2**.
+`m2`.
 
 **Representation of exercised privileges in logs**
 
@@ -71,7 +71,7 @@ generation.
 
   Sets the seed for PRNG for reproducibility (default: `2025`).
 
--- `--priv-rep-ratio=NUM`
+- `--priv-rep-ratio=NUM`
 
    Upper bound on the ratio of the actual privilege representation to the actual
    privilege for each corresponding pair of rules. It is an upper bound due to
@@ -82,7 +82,7 @@ generation.
    Note that for some case studies, this general default may be overridden for
    some corresponding pairs.
 
--- `--over-priv-percent=INT`
+- `--over-priv-percent=INT`
 
    An upper bound on the percentage of the actual privilege representation that
    is over privilege representation. Values range from 0 to 49.

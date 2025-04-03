@@ -163,6 +163,35 @@ just entities themselves. These can be classified similarly to entities.
     - A minimum number of TAs for course could conflict with the upper bound on
       TA courseloads.
 
+### Log Generation
+
+Setting aside considerations for families, log generation is comparatively
+straightforward. In general, it is controlled by two parameters,
+`--priv-rep-ratio` and `--over-priv-percent`. For each corresponding pair of
+rules `(r1,r2)`, the space of valid privilege is randomly sampled (floor of)
+`|P(r1)| * R * (100-O)/100` times, where
+- `P(r)` is the privilege of rule `r`
+- `R` is the ratio set by `--priv-rep-ratio`
+- `O` is the percentage set by `--over-priv-percent`
+
+The set of requests produces by this sampling is the *valid privilege representation.*
+
+Then, the space of over privilege is sampled (floor of) `|P(r1)| * R * O/100`
+times, producing the *over privilege representation*. The union of these sets is
+the privilege representation of the actual rule `r2` in the log.
+
+Sampling of the privilege of a corresponding pair of rules is not fully uniform.
+1. The set of actions applicable to a rule is sampled uniformly at random.
+2. The set of principles *capable of performing that action on some resource* is
+   sampled uniformly at random.
+3. The set of resources upon which the principal can apply that action is
+   selected uniformly at random.
+
+So, for example if a rule is applicable to actions `A1` and `A2`, but the
+partition of the privilege of the rule corresponding to `A2` is very small, that
+partition will likely be over-represented in the privilege representation of the
+rule in the log. The above also assumes that each step can succeed, which is a
+guarantee that entity generation must ensure.
 
 ### Invocation
 

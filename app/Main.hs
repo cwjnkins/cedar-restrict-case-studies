@@ -1,4 +1,4 @@
-{-# LANGUAGE RecordWildCards #-}
+{-# LANGUAGE ParallelListComp, RecordWildCards #-}
 {-# OPTIONS_GHC -fno-cse #-}
 
 
@@ -19,7 +19,7 @@ import Lib.IO
 
 import Config
 import qualified GClassroom.GenEntities as GC
-import qualified GClassroom.GenLogs     as GC
+-- import qualified GClassroom.GenLogs     as GC
 import qualified ProjMan.GenEntities    as PM
 import qualified ProjMan.GenLogs        as PM
 import qualified HotCRP.GenEntities     as HC
@@ -35,17 +35,29 @@ main = do
     gc :: Config -> IO ()
     gc conf@GC{..} = do
       let gen = mkStdGen seed
-      let (gclass, g') = GC.randomGClassroom conf & flip runState gen
-      GC.toGClassEntities gclass & encodeFile entityStore
-      let (log, _) = GC.createEventLog conf gclass & flip runState g'
-      res <-
-        forM log $ \ req -> do
-          dec <-
-            authorize'
-              (CedarCtxt "cedar" Nothing entityStore policyStore)
-             req
-          return $ LogEntry req dec
-      encodeFile logs res
+      let (gclassFam, g') = GC.randomGClassroom conf & flip runState gen
+      _ <-
+        [ encodeFile path (gcls & GC.toGClassEntities)
+        | gcls <- gclassFam | path <- conf & entityStoreFP
+        ] & sequence
+      -- forM gclassFam
+      --   (\ gcls ->
+      --      forM (conf & entityStoreFP)
+      --        (\ path ->
+      --           gcls
+      --           & GC.toGClassEntities
+      --           & encodeFile path))
+      return ()
+      -- GC.toGClassEntities gclass & encodeFile entityStore
+      -- let (log, _) = GC.createEventLog conf gclass & flip runState g'
+      -- res <-
+      --   forM log $ \ req -> do
+      --     dec <-
+      --       authorize'
+      --         (CedarCtxt "cedar" Nothing entityStore policyStore)
+      --        req
+      --     return $ LogEntry req dec
+      -- encodeFile logs res
 
     pm :: Config -> IO ()
     pm conf@PM{..} = do

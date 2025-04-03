@@ -84,6 +84,7 @@ data GClassroom = GClassroom
   , tas         :: [Staff]
   , teachers    :: [Staff]
   }
+  deriving (Show)
 
 data GClassAction =
     PostAssignment

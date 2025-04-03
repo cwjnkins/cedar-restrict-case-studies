@@ -1,4 +1,4 @@
-{-# LANGUAGE RecordWildCards, ScopedTypeVariables, TupleSections #-}
+{-# LANGUAGE ParallelListComp, RecordWildCards, ScopedTypeVariables, TupleSections #-}
 
 module GClassroom.GenEntities where
 
@@ -26,204 +26,168 @@ type PreTA      = Int
 type CourseCatalog = [Course] -- all courses
 type CourseLoad    = [Course] -- courses of a student/teacher/ta
 
+type CourseAssignments = [Assignment]
+type CourseEnrollment  = [Student]
+
+-- Fixed values: students, teachers, TAs
+generatePreEntities :: [Int] -> Family [Int]
+generatePreEntities sizes =
+  tabulateFamily
+    (\ prevFam thisFam -> [prevFam..thisFam-1])
+    sizes
+
 generatePreStudents :: Config -> Family [PreStudent]
 generatePreStudents conf =
-  [ [0..f-1]
-  | f <- conf & numStudents ]
+  generatePreEntities (conf & numStudents)
 
 generatePreTeachers :: Config -> Family [PreTeacher]
 generatePreTeachers conf =
-  [ [0..f-1]
-  | f <- conf & numTeachers ]
+  generatePreEntities (conf & numTeachers)
 
 generatePreTAs :: Config -> Family [PreTA]
 generatePreTAs conf =
-  [ [0..f-1]
-  | f <- conf & numTAs ]
+  generatePreEntities (conf & numTAs)
 
--- Generate the course catalog together with teachers
-randomCourseCatalogWithStaff
-  :: RandomGen g => Config -> Family [PreTeacher]
-     -> Family (State g (CourseCatalog,[Staff]))
-randomCourseCatalogWithStaff conf teachersFam =
-  [ catalog teachers
-  | teachers <- teachersFam ]
+-- random values: courses (and course loads)
+--------------------------------------------------
+
+-- Freshly generate random courses, grouped as course loads by the teacher
+-- instructing them
+randomCourseLoad :: RandomGen g => Config -> PreTeacher -> State g CourseLoad
+randomCourseLoad conf teach = do
+  numCourses <- state $ randomR (1, conf & maxTeacherCourseload)
+  return $
+    [ mkCourse ("T" ++ show teach ++ "C" ++ show (cno - 1))
+    | cno <- [1..numCourses] ]
+
+randomTeacherCourseLoads ::
+  RandomGen g => Config -> Family [PreTeacher] -> State g (Family [CourseLoad])
+randomTeacherCourseLoads conf teachFam = do
+  forM teachFam
+    (\ teachers ->
+       forM teachers
+         (\ teach ->
+            randomCourseLoad conf teach))
+
+-- Freshly generate a random course catalog, assigning courses to teachers to
+-- create the teaching staff
+randomCourseCatalogWithTeachers ::
+  RandomGen g => Config -> Family [PreTeacher] -> State g (Family ([Staff], CourseCatalog))
+randomCourseCatalogWithTeachers conf teachFam = do
+  clsFam <- randomTeacherCourseLoads conf teachFam
+  let catalogFam = clsFam & map concat
+  let staffFam =
+        zipFamilyWith
+          (\ teach cl -> mkTeacher (show teach) cl)
+          teachFam clsFam
+  return $ zip staffFam catalogFam
+
+-- Randomly assign entities to courses after the courses have been generated
+-- (students, TAs)
+--
+-- For family generation, the newer entities pull from the pool of older and
+-- newer courses.
+--
+-- NOTE: it is possible that courses may not be assigned any such "ex post
+-- facto" entities. In particular, this means there may be courses without
+-- students.
+randomPostFactoEntityCourseloads ::
+  RandomGen g => Int -> Family CourseCatalog -> Family [Int]
+                 -> State g (Family [CourseLoad])
+randomPostFactoEntityCourseloads maxCourseLoad catalogFam entsFam = do
+  let catalogPools = catalogFam & toPools
+  zipWithM
+    (\ ents catalog ->
+       forM ents
+         (\ _ -> do
+            n <- state $ randomR (1, maxCourseLoad)
+            randomElemsNoRepeat n catalog))
+    entsFam catalogPools
+
+randomPostFactoEntities ::
+  RandomGen g => Int -> (Int -> CourseLoad -> a)
+                 -> Family CourseCatalog -> Family [Int]
+                 -> State g (Family [a])
+randomPostFactoEntities maxCL mkEnt catalogFam entsFam = do
+  courseloadFam <- randomPostFactoEntityCourseloads maxCL catalogFam entsFam
+  return $ zipFamilyWith mkEnt entsFam courseloadFam
+
+randomTAs ::
+  RandomGen g => Config -> Family CourseCatalog -> Family [PreTA]
+                 -> State g (Family [Staff])
+randomTAs conf =
+  randomPostFactoEntities (conf & maxTACourseload)
+    (\ id cl -> mkTA (show id) cl)
+
+randomStudents ::
+  RandomGen g => Config -> Family CourseCatalog -> Family [PreStudent]
+                 -> State g (Family [Student])
+randomStudents conf =
+  randomPostFactoEntities (conf & maxStudentCourseload)
+    (\ id cl -> mkStudent (show id) cl)
+
+randomAssignmentsByCourse ::
+  RandomGen g => Config -> Family CourseCatalog -> State g (Family [CourseAssignments])
+randomAssignmentsByCourse conf catalogFam = do
+  forM catalogFam
+    (\ catalog ->
+       forM catalog
+         (\ course -> do
+             numAssignments <- state $ randomR (1, conf & maxAssignmentsPerCourse)
+             return $
+               [ mkAssignment (assignId course i) course
+               | i <-[0..numAssignments-1]]))
   where
-    courseload :: RandomGen g => State g Int
-    courseload = state $ randomR (1, conf & maxTeacherCourseload)
+    assignId :: Course -> Int -> String
+    assignId c i = (c & uid & __entity & _id) ++ "A" ++ show i
 
-    create :: (PreTeacher, Int) -> (Staff,CourseLoad)
-    create (teach,numCourses) =
-      let teacherCourses :: CourseLoad =
-            [ mkCourse ("T" ++ show teach ++ "C" ++ show cno)
-            | cno <- [0..numCourses-1] ]
-      in
-      (mkTeacher (show teach) teacherCourses , teacherCourses)
 
-    catalog :: RandomGen g => [PreTeacher] -> State g (CourseCatalog,[Staff])
-    catalog teachers = do
-      assocTeachCourseload :: [(Staff, CourseLoad)] <-
-        forM teachers (\ t -> (t,) <$> courseload)
-        & fmap (map create)
-      return $
-        ( assocTeachCourseload & concatMap snd
-        , assocTeachCourseload & map fst)
-
--- Randomly generate the courseload for a student.
---
--- The courses comprising the courseload are picked randomly (without
--- replacement) from the `courses` parameter
-randomStudentCourseload
-  :: RandomGen g => Family CourseCatalog -> Family (State g)
-
--- randomStudentCourseload :: RandomGen g => [Course] -> State g [Course]
--- randomStudentCourseload courses = do
---   shuff <- uniformShuffleList courses
---   load <- state $ randomR (1, maxCourseLoadSafe conf)
---   return $ shuff & take load
-
--- Create students from their courseloads
---
--- ENSURES length courseLoads == length (generateStudents courseLoads)
-generateStudents :: [[Course]] -> [Student]
-generateStudents courseLoads =
-  courseLoads
-  & zipWith
-      (\ studId courseLoad ->
-         mkStudent (show studId) courseLoad)
-      [0..(length courseLoads - 1)]
-
--- `randomStudents numStuds courses` randomgly generates `numStuds` students
--- with courseloads pulled randomly (without replacement) from `courses`
-randomStudents :: RandomGen g => Int -> [Course] -> State g [Student]
-randomStudents numStuds courses =
-  generateStudents <$> replicateM numStuds (randomStudentCourseload courses)
-
--- Randomly generate courseloads for ever teacher.
---
--- NOTE: The invariant is that each course has precisely one teacher; a teacher
--- may have any number of courses (including 0)
-randomTeacherCourseloads :: RandomGen g => Int -> [Course] -> State g [[Course]]
-randomTeacherCourseloads numTeachers courses = do
-  -- NOTE: A teacher might not have any courses
-  assocTeachCourse :: [(Int,Course)] <-
-    forM courses (\ c -> (, c) <$> randomTeacherId)
-  return [courseload assocTeachCourse i | i <- [1..numTeachers-1]]
+generateGrades ::
+  Config -> Pools [CourseEnrollment] -> Family [CourseAssignments]
+  -> Pools [Grade]
+generateGrades conf courseEnrollmentPools courseAssignmentsFam =
+  zipFamilyWith
+    (\ studs assigns ->
+       [ mkGrade (gradeId s a) s a
+       | s <- studs , a <- assigns ])
+    courseEnrollmentPools (courseAssignmentsFam & toPools)
+  & map concat
   where
-    randomTeacherId :: RandomGen g => State g Int
-    randomTeacherId = state $ randomR (0, numTeachers - 1)
+    gradeId :: Student -> Assignment -> String
+    gradeId s a =
+      (a & uid & __entity & _id)
+      ++ "S"
+      ++ (s & uid & __entity & _id)
 
-    -- Given the teacher courseload (as pairs of teacher ids with a course),
-    -- find all courses for the given teacher id
-    courseload :: [(Int, Course)] -> Int -> [Course]
-    courseload assoc idx =
-      assoc
-      & filter (\ (i,_) -> i == idx)
-      & map snd
 
--- Randomly assign one course to one TA.
---
--- NOTE: The invariant is every TA has exactly one course, courses can have any
--- number of TAs (including 0)
-randomTACourseloads :: RandomGen g => Int -> [Course] -> State g [Course]
-randomTACourseloads numTAs courses =
-  replicateM numTAs (randomElem courses)
-
--- Generate all staff, given the teacher and ta workloads.
---
--- Staff are assigned ids sequentially, with TAs numbered following teachers
-generateStaff :: [[Course]] -> [[Course]] -> ([Staff], [Staff])
-generateStaff teacherWorkload taWorkload =
-  let teachLen = length teacherWorkload
-      taLen    = length taWorkload
-      teachIDs = ["TE" ++ show i | i <- [0..teachLen-1]]
-      taIDs    = ["TA" ++ show i | i <- [0..taLen-1]]
-  in
-  ( zipWith mkTeacher teachIDs teacherWorkload
-  , zipWith mkTA taIDs taWorkload )
-
-randomStaff :: RandomGen g => Int -> Int -> [Course] -> State g ([Staff], [Staff])
-randomStaff numTeach numTA courses = do
-  teachCLs <- randomTeacherCourseloads numTeach courses
-  taCLs    <- randomTACourseloads numTA courses
-  return $ generateStaff teachCLs (taCLs & map (:[]))
-
--- Generate all assignments using a list of all courses, each
--- tupled with the number of assignments for the course
---
--- UID Example: the first assignment for the second course has id "C1A0"
-generateAssignments :: [(Int,Course)] -> [Assignment]
-generateAssignments =
-  concatMap genAssign
+randomGClassroom :: RandomGen g => Config -> State g (Family GClassroom)
+randomGClassroom conf = do
+  let preStudentsFam = conf & generatePreStudents
+      preTeachersFam = conf & generatePreTeachers
+      preTAsFam      = conf & generatePreTAs
+  (teachersFam, catalogFam) <-
+    randomCourseCatalogWithTeachers conf preTeachersFam
+    & (fmap unzip)
+  tasFam <- randomTAs conf catalogFam preTAsFam
+  studsFam <- randomStudents conf catalogFam preStudentsFam
+  assignmentsByCourseFam <- randomAssignmentsByCourse conf catalogFam
+  let studEnrollmentPools = groupStudentsByEnrollment catalogFam studsFam
+  let gradesPools = generateGrades conf studEnrollmentPools assignmentsByCourseFam
+  return $
+    [ GClassroom studs catalog assigns grds ts tchs
+    | studs <- studsFam & toPools
+    | catalog <- catalogFam & toPools
+    | assigns <- assignmentsByCourseFam & map concat & toPools
+    | grds <- gradesPools
+    | ts <- tasFam & toPools
+    | tchs <- teachersFam & toPools
+    ]
   where
-    genAssign :: (Int,Course) -> [Assignment]
-    genAssign (numAssign, forCourse) =
-      [0..numAssign-1]
-      & map
-          (\ id ->
-             let fullId =
-                   "C" ++ (forCourse & getEntityName)
-                   ++ "A" ++ show id
-             in
-             mkAssignment fullId forCourse)
-
-
--- Randomly generate the number of assignments for a course
-randomNumAssignments :: RandomGen g => Config -> State g Int
-randomNumAssignments conf =
-  state $ randomR (1, conf & maxCourseAssignmentsSafe)
-
--- Randomly generate assignments for each course, where the number of
--- assignments generate is itself random.
-randomAssignments :: RandomGen g => Config -> [Course] -> State g [Assignment]
-randomAssignments conf courses = do
-  assocNumAssignsCourse :: [(Int, Course)] <-
-    forM courses
-      (\ c ->
-         (,c) <$> randomNumAssignments conf)
-  return $ generateAssignments assocNumAssignsCourse
-
--- Deterministically generate the grade entities for a given assignment.
---
--- The number of grades generated is the number of students enrolled in course
--- to which the assignment belongs. Note, the invariant we keep is that a grade
--- is uniquely determined by its fields (there are no two distinct grade
--- entities for the same (student, assignment) pair)
-generateGradesForAssignment :: [Course] -> [Student] -> Assignment -> [Grade]
-generateGradesForAssignment courses studs assign =
-  let course = assign & findAssignmentCourse courses
-      enrolled = course & findCourseStudents studs in
-  enrolled
-  & map (\ s -> mkGrade (fmtGId s) s assign)
-  where
-    fmtGId :: Student -> String
-    fmtGId stud =
-      "A"
-      ++ (assign & uid & __entity & _id)
-      ++ "_S"
-      ++ (stud & uid & __entity & _id)
-
--- Deterministically generate all grades for every pair of assignment and
--- student in the course for the assignment
-generateGrades :: [Assignment] -> [Course] -> [Student] -> [Grade]
-generateGrades assigns cours studs =
-  assigns
-  & concatMap (generateGradesForAssignment cours studs)
-
--- Randomly generate a classroom
-randomGClassroom :: RandomGen g => Config -> State g GClassroom
-randomGClassroom conf@GC{..} = do
-  let courses = generateCourses numCourses
-  studs <- randomStudents numStudents courses
-  assignments <- randomAssignments conf courses
-  (teachers, tas) <-
-    randomStaff (conf & numTeachersSafe) (conf & numTAsSafe) courses
-  let grades = generateGrades assignments courses studs
-  return $ GClassroom
-    { students = studs
-    , courses  = courses
-    , assignments = assignments
-    , grades = grades
-    , tas = tas
-    , teachers = teachers
-    }
+    groupStudentsByEnrollment :: Family CourseCatalog -> Family [Student] -> Pools [CourseEnrollment]
+    groupStudentsByEnrollment catalogFam studentsFam =
+      [ catalog & map (findCourseStudents students)
+      | catalog <- catalogFam & toPools
+      | students <- studentsFam & toPools ]
+      -- let finalStudents = studentsFam & fromFamily & last in
+      -- catalogFam
+      -- & mapFamily (findCourseStudents finalStudents)

@@ -1,6 +1,7 @@
 module Lib.Util where
 
 import Control.Monad.State.Strict
+import Data.Function
 import List.Shuffle
 import System.Random.Stateful
 
@@ -16,3 +17,9 @@ randomElem :: RandomGen g => [a] -> State g a
 randomElem xs = do
   idx <- state $ randomR (0, length xs - 1)
   return $ xs !! idx
+
+-- NOTE: poorly optimized
+randomElemsNoRepeat :: RandomGen g => Int -> [a] -> State g [a]
+randomElemsNoRepeat n xs = do
+  shuff <- uniformShuffleList xs
+  return $ shuff & take n

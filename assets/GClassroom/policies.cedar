@@ -1,5 +1,5 @@
 // posting assignments
-// tightening: only when not isTA
+// tightening: only when (principal.role == Role::"Teacher")
 permit
   ( principal
   , action == Action::"PostAssignment"

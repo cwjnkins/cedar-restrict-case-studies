@@ -36,7 +36,7 @@ For each rule of a policy (either ideal or actual), call the set of all requests
 for which the policy accepts the request, the *privilege* afforded by the rule.
 For each pair of rules `(r1,r2)` where `r1` is a rule from the ideal policy and
 `r2` is the corresponding rule from the actual policy:
-- the **valid privilege** is the privilege of `r1`;
+- the **ideal privilege** is the privilege of `r1`;
 - the **actual privilege** is the privilege of `r2`;
 - the **over privilege** is the set difference of the privilege of `r2` and
   `r1`.
@@ -47,8 +47,8 @@ corresponding rules implicit when this is unambiguous.
 
 - The **privilege representation** of a rule `r` in a log is the number of
   requests in that log that are members of the privilege of `r`.
-- The **valid privilege representation** and **over privilege representation**
-  are resp. the privilege representations for the valid privilege of `r1` and
+- The **ideal privilege representation** and **over privilege representation**
+  are resp. the privilege representations for the ideal privilege of `r1` and
   the over privilege of `r2` in a log.
 
 **Shared command line arguments**
@@ -168,13 +168,13 @@ just entities themselves. These can be classified similarly to entities.
 Setting aside considerations for families, log generation is comparatively
 straightforward. In general, it is controlled by two parameters,
 `--priv-rep-ratio` and `--over-priv-percent`. For each corresponding pair of
-rules `(r1,r2)`, the space of valid privilege is randomly sampled (floor of)
+rules `(r1,r2)`, the space of ideal privilege is randomly sampled (floor of)
 `|P(r1)| * R * (100-O)/100` times, where
 - `P(r)` is the privilege of rule `r`
 - `R` is the ratio set by `--priv-rep-ratio`
 - `O` is the percentage set by `--over-priv-percent`
 
-The set of requests produces by this sampling is the *valid privilege representation.*
+The set of requests produces by this sampling is the *ideal privilege representation.*
 
 Then, the space of over privilege is sampled (floor of) `|P(r1)| * R * O/100`
 times, producing the *over privilege representation*. The union of these sets is

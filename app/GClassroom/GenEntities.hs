@@ -117,7 +117,7 @@ randomTAs ::
                  -> State g (Family [Staff])
 randomTAs conf =
   randomPostFactoEntities (conf & maxTACourseload)
-    (\ id cl -> mkTA (show id) cl)
+    (\ id cl -> mkTA ("TA" ++ show id) cl)
 
 randomStudents ::
   RandomGen g => Config -> Family CourseCatalog -> Family [PreStudent]
@@ -143,21 +143,42 @@ randomAssignmentsByCourse conf catalogFam = do
 
 
 generateGrades ::
-  Config -> Pools [CourseEnrollment] -> Family [CourseAssignments]
-  -> Pools [Grade]
-generateGrades conf courseEnrollmentPools courseAssignmentsFam =
-  zipFamilyWith
-    (\ studs assigns ->
-       [ mkGrade (gradeId s a) s a
-       | s <- studs , a <- assigns ])
-    courseEnrollmentPools (courseAssignmentsFam & toPools)
-  & map concat
+  Config -> Pools CourseCatalog -> Pools [Assignment] -> Family [Student]
+  -> Family [Grade]
+generateGrades conf catalogPools assignmentPools studentsFam =
+  [ gradeFamMember catalog assignments newStudents
+  | catalog <- catalogPools
+  | assignments <- assignmentPools
+  | newStudents <- studentsFam
+  ]
   where
     gradeId :: Student -> Assignment -> String
     gradeId s a =
       (a & uid & __entity & _id)
       ++ "S"
       ++ (s & uid & __entity & _id)
+
+    gradeFamMember :: CourseCatalog -> [Assignment] -> [Student] -> [Grade]
+    gradeFamMember catalog assignments newStudents = do
+      stud <- newStudents
+      assignment <- stud & findStudentAssignments catalog assignments
+      return $ mkGrade (gradeId stud assignment) stud assignment
+
+-- generateGrades ::
+--   Config -> Pools [CourseEnrollment] -> Family [CourseAssignments]
+--   -> Family [Grade]
+  -- zipFamilyWith
+  --   (\ studs assigns ->
+  --      [ mkGrade (gradeId s a) s a
+  --      | s <- studs , a <- assigns ])
+  --   courseEnrollmentPools (courseAssignmentsFam & toPools)
+  -- & map concat
+  -- where
+  --   gradeId :: Student -> Assignment -> String
+  --   gradeId s a =
+  --     (a & uid & __entity & _id)
+  --     ++ "S"
+  --     ++ (s & uid & __entity & _id)
 
 
 randomGClassroom :: RandomGen g => Config -> State g (Family GClassroom)
@@ -170,17 +191,23 @@ randomGClassroom conf = do
     & (fmap unzip)
   tasFam <- randomTAs conf catalogFam preTAsFam
   studsFam <- randomStudents conf catalogFam preStudentsFam
-  assignmentsByCourseFam <- randomAssignmentsByCourse conf catalogFam
-  let studEnrollmentPools = groupStudentsByEnrollment catalogFam studsFam
-  let gradesPools = generateGrades conf studEnrollmentPools assignmentsByCourseFam
+  assignmentsFam :: Family [Assignment] <-
+    randomAssignmentsByCourse conf catalogFam
+    & fmap (map concat)
+  -- let studEnrollmentPools = groupStudentsByEnrollment catalogFam studsFam
+  let gradesFam =
+        generateGrades conf
+          (catalogFam & toPools) (assignmentsFam & toPools)
+          studsFam
+  -- generateGrades conf studEnrollmentPools assignmentsByCourseFam
   return $
     [ GClassroom studs catalog assigns grds ts tchs
-    | studs <- studsFam & toPools
-    | catalog <- catalogFam & toPools
-    | assigns <- assignmentsByCourseFam & map concat & toPools
-    | grds <- gradesPools
-    | ts <- tasFam & toPools
-    | tchs <- teachersFam & toPools
+    | studs <- studsFam
+    | catalog <- catalogFam
+    | assigns <- assignmentsFam -- assignmentsByCourseFam & map concat
+    | grds <- gradesFam -- gradesPools
+    | ts <- tasFam
+    | tchs <- teachersFam
     ]
   where
     groupStudentsByEnrollment :: Family CourseCatalog -> Family [Student] -> Pools [CourseEnrollment]

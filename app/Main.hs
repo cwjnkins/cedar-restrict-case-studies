@@ -19,7 +19,7 @@ import Lib.IO
 
 import Config
 import qualified GClassroom.GenEntities as GC
--- import qualified GClassroom.GenLogs     as GC
+import qualified GClassroom.GenLogs     as GC
 import qualified ProjMan.GenEntities    as PM
 import qualified ProjMan.GenLogs        as PM
 import qualified HotCRP.GenEntities     as HC
@@ -36,17 +36,25 @@ main = do
     gc conf@GC{..} = do
       let gen = mkStdGen seed
       let (gclassFam, g') = GC.randomGClassroom conf & flip runState gen
-      _ <-
-        [ encodeFile path (gcls & GC.toGClassEntities)
-        | gcls <- gclassFam | path <- conf & entityStoreFP
+      [ encodeFile path (gcls & GC.toGClassEntities)
+        | gcls <- gclassFam & toPoolsGen GC.mergeGClassroom
+        | path <- conf & entityStoreFP
         ] & sequence
-      -- forM gclassFam
-      --   (\ gcls ->
-      --      forM (conf & entityStoreFP)
-      --        (\ path ->
-      --           gcls
-      --           & GC.toGClassEntities
-      --           & encodeFile path))
+      let (logFam, _) = GC.createEventLog conf gclassFam & flip runState g'
+      -- sanity check: even though it will take longer, rerun old requests under
+      -- a new entity store to help detect bugs
+      resPool <-
+        [ forM log
+            (\ req -> do
+                dec <- authorize' (CedarCtxt "cedar" Nothing entityStore policy_store) req
+                return $ LogEntry req dec)
+          | log <- logFam & toPools
+          | entityStore <- conf & entityStoreFP
+        ] & sequence
+      [ encodeFile path res
+        | res <- resPool
+        | path <- conf & logStoreFP
+        ] & sequence
       return ()
       -- GC.toGClassEntities gclass & encodeFile entityStore
       -- let (log, _) = GC.createEventLog conf gclass & flip runState g'

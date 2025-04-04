@@ -19,8 +19,8 @@ defaultSchema = "schema.cedarschema"
 defaultPolicies :: FilePath
 defaultPolicies = "policies.cedar"
 
-defaultLogs :: FilePath
-defaultLogs = "logs.json"
+defaultLogBase :: FilePath
+defaultLogBase = "logs"
 
 defaultStoreBase :: String
 defaultStoreBase = "entities"
@@ -44,6 +44,9 @@ zipFamilyWith f = zipWith (zipWith f)
 toPools :: Family [a] -> Pools [a]
 toPools = tail . scanl (++) []
 
+toPoolsGen :: (a -> a -> a) -> Family a -> Pools a
+toPoolsGen = scanl1
+
 -- stateFamily :: Family (State s a) -> State s (Family a)
 -- stateFamily fam = StateT $ \ s ->
 --   let comps = [ runState comp s | comp <- fam ] in
@@ -52,6 +55,14 @@ toPools = tail . scanl (++) []
 data Config =
     GC
       { size :: [Int]
+      , priv_rep_ratio :: Double
+      , over_priv_percent :: Int
+
+      , seed                  :: Int
+      , policy_store          :: FilePath
+      , entity_store_basename :: String
+      , log_store_basename    :: String
+
       -- proportion to `size`
       , student_ratio :: Double
       , teacher_ratio :: Double
@@ -62,13 +73,6 @@ data Config =
       , max_student_courseload     :: Int
       , max_teacher_courseload     :: Int
       , max_ta_courseload          :: Int
-
-      , eop :: Int
-
-      , seed                  :: Int
-      , entity_store_basename :: String
-      , policyStore           :: FilePath
-      , logs                  :: FilePath
       }
   | PM
       { numDevs     :: Int
@@ -107,8 +111,17 @@ entityStoreFP GC{..} =
   | i <- size ]
 entityStoreFP conf = []
 
+logStoreFP :: Config -> Family FilePath
+logStoreFP GC{..} =
+  [ defaultDist ++ "GClassroom/" ++ log_store_basename ++ "." ++ show i ++ ".json"
+  | i <- size ]
+logStoreFP conf = []
+
 gclass = GC
   { size          = []
+  , priv_rep_ratio = 0.4  &= help "Ratio of privilege representation to actual privilege"
+  , over_priv_percent = 5 &= help "Percentage of privilege representation that is over privilege"
+
   , student_ratio = 1.0 &= help "Student body to `size` ratio"
   , teacher_ratio = 0.1 &= help "Teacher to `size` ratio"
   , ta_ratio      = 0.1 &= help "TA to `size` ratio"
@@ -118,15 +131,12 @@ gclass = GC
   , max_teacher_courseload     = 2 &= help "Max courses run by a teacher"
   , max_ta_courseload          = 2 &= help "Max courses for a TA"
 
-  , eop = 0 &= help "Percentage of exercised overprivileges (Default: 0)"
-
   , seed                  = 2025
   , entity_store_basename =    defaultStoreBase
                             &= typFile
-  , policyStore           =    (defaultAssets ++ "GClassroom/" ++ defaultPolicies)
+  , policy_store          =    (defaultAssets ++ "GClassroom/" ++ defaultPolicies)
                             &= typFile
-  , logs                  =    (defaultAssets ++ "GClassroom/" ++ defaultLogs)
-                            &= typFile
+  , log_store_basename    =    defaultLogBase
   } &= help "Generate Cedar classroom case study"
 
 projman = PM
@@ -179,5 +189,9 @@ numExercisedOverPriv totOk percEOP =
 
 preprocess :: Config -> Config
 preprocess conf@GC{..} =
-  conf { size = size & map (max 1) & sort & nub }
+  conf
+  { size = size & map (max 1) & sort & nub
+  , priv_rep_ratio = priv_rep_ratio & max 0 & min 1
+  , over_priv_percent = over_priv_percent & max 0 & min 50
+  }
 preprocess conf = conf

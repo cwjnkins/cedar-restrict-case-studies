@@ -86,6 +86,28 @@ data GClassroom = GClassroom
   }
   deriving (Show)
 
+emptyGClassroom :: GClassroom
+emptyGClassroom =
+  GClassroom
+  { students    = []
+  , courses     = []
+  , assignments = []
+  , grades      = []
+  , tas         = []
+  , teachers    = []
+  }
+
+mergeGClassroom :: GClassroom -> GClassroom -> GClassroom
+mergeGClassroom gc1 gc2 =
+  GClassroom
+  { students    = (gc1 & students)    ++ (gc2 & students)
+  , courses     = (gc1 & courses)     ++ (gc2 & courses)
+  , assignments = (gc1 & assignments) ++ (gc2 & assignments)
+  , grades      = (gc1 & grades)      ++ (gc2 & grades)
+  , tas         = (gc1 & tas)         ++ (gc2 & tas)
+  , teachers    = (gc1 & teachers)    ++ (gc2 & teachers)
+  }
+
 data GClassAction =
     PostAssignment
   | EditAssignment

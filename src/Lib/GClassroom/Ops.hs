@@ -23,6 +23,31 @@ findCourseStudents students course =
   students
   & filter (\ s -> course `entityElem` (s & parents))
 
+findCourseAssignments :: [Assignment] -> Course -> [Assignment]
+findCourseAssignments assignments course' =
+  assignments
+  & filter (\ a -> (a & attrs & course) == (course' & uid))
+
+findStaffCourses :: [Course] -> Staff -> [Course]
+findStaffCourses courses staff =
+  courses
+  & filter (\ c -> c `entityElem` (staff & parents))
+
+findStudentCourses :: [Course] -> Student -> [Course]
+findStudentCourses courses student =
+  courses
+  & filter (\ c -> c `entityElem` (student & parents))
+
+findStaffAssignments :: [Course] -> [Assignment] -> Staff -> [Assignment]
+findStaffAssignments courses assignments staff = do
+  c <- findStaffCourses courses staff
+  findCourseAssignments assignments c
+
+findStudentAssignments :: [Course] -> [Assignment] -> Student -> [Assignment]
+findStudentAssignments courses assignments student = do
+  c <- findStudentCourses courses student
+  findCourseAssignments assignments c
+
 -- GC operations (for log generation)
 class HasCourse a where
   getCourse :: GClassroom -> a -> Course
@@ -35,9 +60,7 @@ class HasCourses a where
   getCourses :: GClassroom -> a -> [Course]
 
 instance HasCourses Staff where
-  getCourses GClassroom{..} staff =
-    courses
-    & filter (\ c -> c `entityElem` (staff & parents))
+  getCourses GClassroom{..} staff = findStaffCourses courses staff
 
 class HasStaff a where
   getStaffDistinguished :: GClassroom -> a -> (Staff,[Staff])
@@ -78,10 +101,16 @@ instance HasStudents Assignment where
     & getCourse gc
     & getStudents gc
 
-getAssignments :: GClassroom -> Course -> [Assignment]
-getAssignments GClassroom{..} c =
-  assignments
-  & filter (\ a -> (c & uid) == (a & attrs & course))
+class HasAssignments a where
+  getAssignments :: GClassroom -> a -> [Assignment]
+
+instance HasAssignments Course where
+  getAssignments GClassroom{..} c =
+    c & findCourseAssignments assignments
+
+instance HasAssignments Staff where
+  getAssignments GClassroom{..} s =
+    s & findStaffAssignments courses assignments
 
 class HasGrades a where
   getGrades :: GClassroom -> a -> [Grade]
@@ -97,6 +126,11 @@ instance HasGrades Course where
     & getAssignments gc
     & concatMap (getGrades gc)
 
+instance HasGrades Staff where
+  getGrades gc@GClassroom{..} s = do
+    c <- s & getCourses gc
+    c & getGrades gc
+
 findGrade :: GClassroom -> Assignment -> Student -> Grade
 findGrade gc@GClassroom{..} assign stud =
   assign
@@ -104,10 +138,11 @@ findGrade gc@GClassroom{..} assign stud =
   & find (\ gr -> (gr & attrs & student) == (stud & uid))
   & fromJust
 
-getAllStaff :: GClassroom -> [Staff]
-getAllStaff GClassroom{..} = teachers ++ tas
-
 getStudentGrades :: GClassroom -> Student -> [Grade]
 getStudentGrades GClassroom{..} stud =
   grades
   & filter (\ gr -> (stud & uid) == (gr & attrs & student))
+
+-- other
+getAllStaff :: GClassroom -> [Staff]
+getAllStaff GClassroom{..} = teachers ++ tas

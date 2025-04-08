@@ -54,7 +54,9 @@ toPoolsGen = scanl1
 
 data Config =
     GC
-      { size :: [Int]
+      { size_start :: Int
+      , size_incr  :: Int
+      , size_end   :: Int
       , priv_rep_ratio :: Double
       , over_priv_percent :: Int
 
@@ -105,20 +107,26 @@ data Config =
     }
   deriving (Show, Data, Typeable)
 
+sizes :: Config -> [Int]
+sizes GC{..} = [size_start,(size_start+size_incr)..size_end]
+sizes _ = []
+
 entityStoreFP :: Config -> Family FilePath
-entityStoreFP GC{..} =
+entityStoreFP conf@GC{..} =
   [ defaultDist ++ "GClassroom/" ++ entity_store_basename ++ "." ++ show i ++ ".json"
-  | i <- size ]
+  | i <- conf & sizes ]
 entityStoreFP conf = []
 
 logStoreFP :: Config -> Family FilePath
 logStoreFP GC{..} =
   [ defaultDist ++ "GClassroom/" ++ log_store_basename ++ "." ++ show i ++ ".json"
-  | i <- size ]
+  | i <- conf & sizes ]
 logStoreFP conf = []
 
 gclass = GC
-  { size          = []
+  { size_start = 20
+  , size_incr  = 10
+  , size_end   = 40
   , priv_rep_ratio = 0.4  &= help "Ratio of privilege representation to actual privilege"
   , over_priv_percent = 5 &= help "Percentage of privilege representation that is over privilege"
 
@@ -190,8 +198,14 @@ numExercisedOverPriv totOk percEOP =
 preprocess :: Config -> Config
 preprocess conf@GC{..} =
   conf
-  { size = size & map (max 1) & sort & nub
+  { size_start = size_start'
+  , size_incr  = size_incr'
+  , size_end   = size_end'
   , priv_rep_ratio = priv_rep_ratio & max 0 & min 1
   , over_priv_percent = over_priv_percent & max 0 & min 50
   }
+  where
+    size_start' = max size_start 0
+    size_incr'  = max size_incr 1
+    size_end'   = max size_end size_start'
 preprocess conf = conf

@@ -48,6 +48,12 @@ findStudentAssignments courses assignments student = do
   c <- findStudentCourses courses student
   findCourseAssignments assignments c
 
+findGradeAssignment :: [Assignment] -> Grade -> Assignment
+findGradeAssignment assignments grade =
+  assignments
+  & find (\ a -> (a & uid) == (grade & attrs & gassignment))
+  & fromJust
+
 -- GC operations (for log generation)
 class HasCourse a where
   getCourse :: GClassroom -> a -> Course
@@ -55,6 +61,10 @@ class HasCourse a where
 instance HasCourse Assignment where
   getCourse GClassroom{..} assignment =
     assignment & findAssignmentCourse courses
+
+instance HasCourse Grade where
+  getCourse gc@GClassroom{..} grade =
+    grade & findGradeAssignment assignments & getCourse gc
 
 class HasCourses a where
   getCourses :: GClassroom -> a -> [Course]
@@ -146,3 +156,11 @@ getStudentGrades GClassroom{..} stud =
 -- other
 getAllStaff :: GClassroom -> [Staff]
 getAllStaff GClassroom{..} = teachers ++ tas
+
+getGradesNotForStaffMember :: GClassroom -> Staff -> [Grade]
+getGradesNotForStaffMember gc@GClassroom{..} staffMem =
+  grades
+  & filter
+      (\ gr ->
+         let c = gr & getCourse gc
+         in  not (c `entityElem` (staffMem & parents)))

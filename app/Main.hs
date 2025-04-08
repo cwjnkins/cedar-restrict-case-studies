@@ -26,7 +26,9 @@ import qualified HotCRP.GenEntities     as HC
 
 main :: IO ()
 main = do
-  cnf <- cmdArgs conf
+  cnf <- do
+    tmp <- cmdArgs conf
+    return $ tmp & preprocess
   case cnf of
     GC{..} -> gc cnf
     PM{..} -> pm cnf

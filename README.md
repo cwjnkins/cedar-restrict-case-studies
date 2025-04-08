@@ -45,8 +45,9 @@ We call such pairs of rules *corresponding rules,* with `r1` the *ideal rule*
 and `r2` the *actual rule*. Henceforth, we leave implicit quantification over
 corresponding rules implicit when this is unambiguous.
 
-- The **privilege representation** of a rule `r` in a log is the number of
-  requests in that log that are members of the privilege of `r`.
+- The **privilege representation** of a rule `r` in a log is the set (more
+  accurately, *multiset*) of requests in that log that are members of the
+  privilege of `r`.
 - The **ideal privilege representation** and **over privilege representation**
   are resp. the privilege representations for the ideal privilege of `r1` and
   the over privilege of `r2` in a log.

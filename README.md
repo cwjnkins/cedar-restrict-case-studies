@@ -104,8 +104,9 @@ entity types.
   argument.
 
   For the Google classroom example, these entity types are: students, teachers,
-  and TAs (technically, Staff and Role, but we informally treat teachers and TAs
-  as separate entity types here).
+  and TAs (technically, Staff, where teachers and TAs are distinguished by their
+  role attribute, but we informally treat teachers and TAs as separate entity
+  types here).
 - A *secondary entity type* is one for which the realism-maintaining invariants
   require that the number of such entities be a (random) function of the number
   of entities of one or more primary or secondary entity types. The command line
@@ -141,8 +142,9 @@ just entities themselves. These can be classified similarly to entities.
   - a grade corresponds to exactly one student-assignment pair (enforced by the
     entity model)
 
-- A *secondary entity relation* is a one-to-many relation, with the upper bound
-  on the cardinality of "many" set by a command line argument.
+- A *secondary entity relation* is a one--to-many relation (one primary entity
+  to many secondary/tertiary entities), with the upper bound on the cardinality
+  of "many" set by a command line argument.
 
   In the Google classroom example, this is:
   - each teacher, TA, and student is in at least one course (upper bounds are
@@ -193,6 +195,40 @@ partition of the privilege of the rule corresponding to `A2` is very small, that
 partition will likely be over-represented in the privilege representation of the
 rule in the log. The above also assumes that each step can succeed, which is a
 guarantee that entity generation must ensure.
+
+### Data Family Generation
+
+The generation of families of datasets, like with the generation of a particular
+dataset, is driven by the entities designated as primary for the case study. For
+two family members of sizes `n1` and `n2` where `n1 < n2`
+- the number of new entities of a given primary entity type is calculated by
+  `n2 * ENTITY_SIZE_RATIO - n1 * ENTITY_SIZE_RATIO` (where `ENTITY_SIZE_RATIO`
+  is the value of the command line argument associated with that entity type)
+- the number of new entities of a given secondary entity type is calculated
+  randomly but in proportion to the number of newly-added primary and secondary
+  entities (if applicable)
+- the new primary entity relations are generated solely on the basis of the
+  newly-added primary and secondary entities
+  For example:
+  - in GClassrooom:
+      - when adding new courses, only the new teachers are considered as instructors
+        for the course
+      - when adding new assignments and TAs, only the new courses are considered
+- the new secondary relations are generated randomly in proportion to the
+  newly-added primary entities and the *cumulative* secondary/tertiary entities
+  For example:
+  - in GClassroom:
+    - newly-created students and TAs are assigned courses randomly from the pool
+      of new and old courses. Note that this is not the case for teachers, as
+      courses must have exactly one teacher (and all old courses already have a
+      teacher).
+- new tertiary entities are generated based on the newly-added primary entities
+  and the cumulative secondary/tertiary entities
+  For example:
+  - for GClassroom:
+    - for each newly-added student, we gather all the assignments for all the
+      courses in which the student is enrolled (which may be new or old courses)
+      and generate a new grade entity for each distinct pair.
 
 ### Invocation
 

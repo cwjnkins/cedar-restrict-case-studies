@@ -8,6 +8,7 @@ import GHC.Generics
 
 import Lib.Action
 import Lib.Entity
+import Lib.Request
 
 type Role = Entity Value
 mkRole :: String -> Role
@@ -26,7 +27,7 @@ roleAccountant :: Role
 roleAccountant = mkRole "Accountant"
 
 data UserAttrs = UserAttrs { role :: UID }
-  deriving (Generic, Show)
+  deriving (Generic, Show, Eq)
 instance ToJSON UserAttrs
 
 type User = Entity UserAttrs
@@ -107,6 +108,12 @@ data PMAction =
 
 toAction :: PMAction -> Action
 toAction act = Action . show $ act
+
+viewBudget :: User -> Project -> Request'
+viewBudget u p = ViewBudget & toAction & toRequest' u p
+
+editBudget :: User -> Project -> Request'
+editBudget u p = EditBudget & toAction & toRequest' u p
 
 data PMEntity =
     PMUser User

@@ -14,6 +14,24 @@ filterUsersByRole :: Role -> [User] -> [User]
 filterUsersByRole r users =
   users & filter (\ u -> (u & attrs & role) == (r & uid))
 
+filterUsersByProject :: Project -> [User] -> [User]
+filterUsersByProject p us =
+    us
+  & filter (\u -> uid p `elem` parents u)
+
+-- ProjMan operations
+projectManagers :: ProjMan -> [User]
+projectManagers pm =
+  pm & users
+  & filter
+    (\ u ->
+       pm & projects
+       & any (\ p -> (p & attrs & manager) == (u & uid)))
+
+getUserProjects :: ProjMan -> User -> [Project]
+getUserProjects pm user =
+  pm & projects & filter (\ p -> p `entityElem` (user & parents))
+
 -- assignToProject :: ProjMan -> User -> Project -> ProjMan
 -- assignToProject pm u p
 --   | (u & attrs & role) == (roleDeveloper & uid) =

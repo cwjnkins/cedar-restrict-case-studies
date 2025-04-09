@@ -31,7 +31,7 @@ mkUID _type name =
   UID (UIDData _type name)
 
 data Entity a = Entity { uid :: UID, attrs :: a, parents :: [UID] }
-  deriving (Generic, Show)
+  deriving (Generic, Show, Eq)
 instance ToJSON a => ToJSON (Entity a)
 
 getEntityName :: Entity a -> String

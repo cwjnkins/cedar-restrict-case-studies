@@ -172,6 +172,12 @@ projman = PM
   -- constant factors
   , max_user_projectload = 3 &= help "Max projects for user"
 
+  , seed                  = 2025
+  , entity_store_basename =    defaultStoreBase
+                            &= typFile
+  , policy_store          =    (defaultAssets ++ "ProjMan/" ++ defaultPolicies)
+                            &= typFile
+  , log_store_basename    =    defaultLogBase
   } &= help "Generate Cedar project management case study"
 
 hotcrp = HC
@@ -192,7 +198,7 @@ hotcrp = HC
 conf =
      modes [gclass, projman, hotcrp]
   &= summary "Generate Cedar case studies"
-  &= program "cav2025-cedar-restrict-gclassroom-exe"
+  &= program "cedar-restrict-case-stuy"
 
 numExercisedOverPriv :: Int -> Int -> Int
 numExercisedOverPriv totOk percEOP =

@@ -117,11 +117,15 @@ entity types.
   interface allows the the number of such entities to be influenced by an upper
   bound on coefficients
 
-  For the Google classroom example, these entity types are:
-  - courses: each teacher teaches a random number of courses from `1` to
-    `max-teacher-courseload`
-  - assignments: each course has a random number of assignments from `1` to
-    `max-assignments-per-course`
+  - For the Google classroom example, these entity types are:
+    - courses: each teacher teaches a random number of courses from `1` to
+      `max-teacher-courseload`
+    - assignments: each course has a random number of assignments from `1` to
+      `max-assignments-per-course`
+  - For the project management example, these are the users designated project
+    managers
+    - each project has exactly one manager (enforced by the entity model)
+    - each user designated as a project manager is in exactly one project
 
 - Finally, a *tertiary entity type* is one for which invariants and the
   relations between primary and secondary entity types completely determines the
@@ -139,21 +143,27 @@ just entities themselves. These can be classified similarly to entities.
 - A *primary entity relation* is an invariant used in entity generation, and so
   is not malleable (save for the number of entities being related).
 
-  In the Google classroom example, this is:
-  - every course has exactly one teacher
-  - every assignment has exactly one course (enforced by the entity model)
-  - a student-assignment pair corresponds to at most one grade
-  - a grade corresponds to exactly one student-assignment pair (enforced by the
-    entity model)
+  - In the Google classroom example, this is:
+    - every course has exactly one teacher
+    - every assignment has exactly one course (enforced by the entity model)
+    - a student-assignment pair corresponds to at most one grade
+    - a grade corresponds to exactly one student-assignment pair (enforced by the
+      entity model)
+  - In the project management example, this is:
+    - there is a bijection between projects and users designated as project
+      managers
 
-- A *secondary entity relation* is a one--to-many relation (one primary entity
-  to many secondary/tertiary entities), with the upper bound on the cardinality
-  of "many" set by a command line argument.
+- A *secondary entity relation* is a one-to-many relation (one primary entity to
+  many entities), with the upper bound on the cardinality of "many" set by a
+  command line argument.
 
-  In the Google classroom example, this is:
-  - each teacher, TA, and student is in at least one course (upper bounds are
-    set by `--max-teacher-courseload`, `--max-ta-courseload`,
-    `--max-student-courseload`)
+  - In the Google classroom example, this is:
+    - each teacher, TA, and student is in at least one course (upper bounds are
+      set by `--max-teacher-courseload`, `--max-ta-courseload`,
+      `--max-student-courseload`)
+  - In the project management example, this is:
+    - every non-project-manager user is in at least one project (upper bound is
+      set by `--max-user-projectload`)
 
 - Finally, a *tertiary entity relation* is a relation directly influenced by one
   or more primary or secondary entity relations, and is thus only indirectly
@@ -211,21 +221,20 @@ two family members of sizes `n1` and `n2` where `n1 < n2`
 - the number of new entities of a given secondary entity type is calculated
   randomly but in proportion to the number of newly-added primary and secondary
   entities (if applicable)
-- the new primary entity relations are generated solely on the basis of the
-  newly-added primary and secondary entities
-  For example:
-  - in GClassrooom:
-      - when adding new courses, only the new teachers are considered as instructors
-        for the course
-      - when adding new assignments and TAs, only the new courses are considered
-- the new secondary relations are generated randomly in proportion to the
-  newly-added primary entities and the *cumulative* secondary/tertiary entities
-  For example:
-  - in GClassroom:
+  - For the GClassroom example: new courses are generated randomly in proportion
+    to the number of new teachers, and new assignments are generated randomly in
+    proportion to the number of new courses.
+- extension of the primary entity relations is driven solely on the basis of
+  the newly-added primary and secondary entities
+  - For the GClassroom example:
+      - when associating courses with teachers, only new teachers are
+        considered as instructors for new courses.
+      - when associating new assignments, only new courses are considered.
+- extension of the secondary entity relations is in proportion to the
+  newly-added primary entities and the *cumulative* secondary/tertiary entities.
+  - For the GClassroom example:
     - newly-created students and TAs are assigned courses randomly from the pool
-      of new and old courses. Note that this is not the case for teachers, as
-      courses must have exactly one teacher (and all old courses already have a
-      teacher).
+      of new and old courses.
 - new tertiary entities are generated based on the newly-added primary entities
   and the cumulative secondary/tertiary entities
   For example:
@@ -233,6 +242,18 @@ two family members of sizes `n1` and `n2` where `n1 < n2`
     - for each newly-added student, we gather all the assignments for all the
       courses in which the student is enrolled (which may be new or old courses)
       and generate a new grade entity for each distinct pair.
+
+Internally, the machinery for data families distinguishes between the "additive"
+and "cumulative" representations of the datasets with the aliases `Family` and
+`Pools`, resp. The entity and log generators produce a `Family` that is
+converted to `Pools` before writing to file (so, each generated .json file
+contains a cumulative dataset containing all the distinct entries from the
+smaller datasets generated from the same run).
+
+The generation of log families is fairly straightforward: for each dataset
+family member, and for each policy rule, a principal is chosen randomly from the
+set of entities newly introduced in the current family member, with the
+resources drawn randomly from all entities generated so far.
 
 ### Invocation
 

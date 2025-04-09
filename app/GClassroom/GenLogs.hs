@@ -173,8 +173,8 @@ createEventLog conf gcFam =
           (idealNum, overNum) =
             (gc & cardEditAssignmentActualPriv, gcOld & cardEditAssignmentActualPriv)
             & calcNumSamples
-      idealRep <- replicateM idealNum $ pPostAssignment gc newTeachers
-      overRep  <- replicateM overNum  $ pPostAssignment gc newTAs
+      idealRep <- replicateM idealNum $ pEditAssignment gc newTeachers
+      overRep  <- replicateM overNum  $ pEditAssignment gc newTAs
       return $ idealRep ++ overRep
 
     randomPostGradeReqs ::

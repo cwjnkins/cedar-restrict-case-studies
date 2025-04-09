@@ -21,7 +21,7 @@ import Config
 import qualified GClassroom.GenEntities as GC
 import qualified GClassroom.GenLogs     as GC
 import qualified ProjMan.GenEntities    as PM
--- import qualified ProjMan.GenLogs        as PM
+import qualified ProjMan.GenLogs        as PM
 import qualified HotCRP.GenEntities     as HC
 
 main :: IO ()
@@ -66,6 +66,19 @@ main = do
       [ encodeFile path (pms & PM.toPMEntities)
         | pms <- projmanFam & toPoolsGen PM.mergeProjMan
         | path <- conf & entityStoreFP
+        ] & sequence
+      let (logFam, _) = PM.createEventLog conf projmanFam & flip runState g'
+      resPool <-
+        [ forM log
+            (\ req -> do
+                dec <- authorize' (CedarCtxt "cedar" Nothing entityStore policy_store) req
+                return $ LogEntry req dec)
+        | log <- logFam & toPools
+        | entityStore <- conf & entityStoreFP
+        ] & sequence
+      [ encodeFile path res
+        | res <- resPool
+        | path <- conf & logStoreFP
         ] & sequence
       return ()
       -- PM.toPMEntities projman & encodeFile entityStore

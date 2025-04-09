@@ -50,6 +50,18 @@ mkUser name rol projs =
     (UserAttrs $ rol & uid)
     (map uid projs)
 
+mkProjectWithManager :: String -> Role -> (Project,User)
+mkProjectWithManager name rol =
+  ( Entity projectUID (ProjectAttrs managerUID) []
+  , Entity managerUID (UserAttrs $ rol & uid) [projectUID]
+  )
+  where
+    projectUID :: UID
+    projectUID = mkUID "Project" name
+
+    managerUID :: UID
+    managerUID = mkUID "User" ("PM" ++ name)
+
 data ProjMan =
   ProjMan
   { developers   :: [User]
@@ -57,6 +69,26 @@ data ProjMan =
   , progmanagers :: [User]
   , accountants  :: [User]
   , projects     :: [Project]
+  }
+
+emptyProjMan :: ProjMan
+emptyProjMan =
+  ProjMan
+  { developers   = []
+  , planners     = []
+  , progmanagers = []
+  , accountants  = []
+  , projects     = []
+  }
+
+mergeProjMan :: ProjMan -> ProjMan -> ProjMan
+mergeProjMan pm1 pm2 =
+  ProjMan
+  { developers = developers pm1 ++ developers pm2
+  , planners = planners pm1 ++ planners pm2
+  , progmanagers = progmanagers pm1 ++ progmanagers pm2
+  , accountants = accountants pm1 ++ accountants pm2
+  , projects = projects pm1 ++ projects pm2
   }
 
 users :: ProjMan -> [User]
@@ -86,9 +118,12 @@ instance ToJSON PMEntity where
   toJSON (PMRole r) = toJSON r
   toJSON (PMProj p) = toJSON p
 
+roles :: [Role]
+roles = [roleDeveloper, rolePlanner, rolePM, roleAccountant]
+
 toPMEntities :: ProjMan -> [PMEntity]
 toPMEntities ProjMan{..} =
-     map PMRole [roleDeveloper, rolePlanner, rolePM, roleAccountant]
+     map PMRole roles
   ++ map PMUser developers
   ++ map PMUser planners
   ++ map PMUser progmanagers

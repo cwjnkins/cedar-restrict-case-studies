@@ -69,6 +69,7 @@ executable cav2025-cedar-restrict-gclassroom-exe
       GClassroom.GenLogs
       HotCRP.GenEntities
       HotCRP.GenLogs
+      ProjMan.Config
       ProjMan.GenEntities
       ProjMan.GenLogs
       Paths_cav2025_cedar_restrict_gclassroom

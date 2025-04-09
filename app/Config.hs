@@ -77,19 +77,23 @@ data Config =
       , max_ta_courseload          :: Int
       }
   | PM
-      { numDevs     :: Int
-      , numPlanners :: Int
-      , numPMs      :: Int
-      , numAccts    :: Int
-      , numProjs    :: Int
-      , maxProjSize :: Int
+      { size_start :: Int
+      , size_incr  :: Int
+      , size_end   :: Int
+      , priv_rep_ratio :: Double
+      , over_priv_percent :: Int
 
-      , exercisedOverprivilege :: Int
+      , seed                  :: Int
+      , policy_store          :: FilePath
+      , entity_store_basename :: String
+      , log_store_basename    :: String
 
-      , seed        :: Int
-      , entityStore :: FilePath
-      , policyStore :: FilePath
-      , logs        :: FilePath
+      -- proportion to `size`
+      , project_ratio :: Double
+      , user_ratio    :: Double
+
+      -- constant factors
+      , max_user_projectload :: Int
       }
   | HC
     { numPC         :: Int
@@ -109,17 +113,24 @@ data Config =
 
 sizes :: Config -> [Int]
 sizes GC{..} = [size_start,(size_start+size_incr)..size_end]
+sizes PM{..} = [size_start,(size_start+size_incr)..size_end]
 sizes _ = []
 
 entityStoreFP :: Config -> Family FilePath
 entityStoreFP conf@GC{..} =
   [ defaultDist ++ "GClassroom/" ++ entity_store_basename ++ "." ++ show i ++ ".json"
   | i <- conf & sizes ]
-entityStoreFP conf = []
+entityStoreFP conf@PM{..} =
+  [ defaultDist ++ "ProjMan/" ++ entity_store_basename ++ "." ++ show i ++ ".json"
+  | i <- conf & sizes ]
+entityStoreFP _ = []
 
 logStoreFP :: Config -> Family FilePath
 logStoreFP GC{..} =
   [ defaultDist ++ "GClassroom/" ++ log_store_basename ++ "." ++ show i ++ ".json"
+  | i <- conf & sizes ]
+logStoreFP PM{..} =
+  [ defaultDist ++ "ProjMan/" ++ log_store_basename ++ "." ++ show i ++ ".json"
   | i <- conf & sizes ]
 logStoreFP conf = []
 
@@ -148,19 +159,19 @@ gclass = GC
   } &= help "Generate Cedar classroom case study"
 
 projman = PM
-  { numDevs     = 50
-  , numPlanners = 20
-  , numPMs      = 15
-  , numAccts    = 15
-  , numProjs    = 10
-  , maxProjSize = 20
-  , seed        = 2025
+  { size_start = 20
+  , size_incr  = 10
+  , size_end   = 40
+  , priv_rep_ratio = 0.25 &= help "Ratio of privilege representation to actual privilege"
+  , over_priv_percent = 5 &= help "Percentage of privilege representation that is over privilege"
 
-  , exercisedOverprivilege = 0 &= help "Percentage of exercised overprivileges (Default: 0)"
+  -- proportion to `size`
+  , project_ratio = 0.1 &= help "Ratio of number of projects to `size`"
+  , user_ratio    = 1.0 &= help "Ratio of number of users to `size`"
 
-  , entityStore = (defaultDist ++ "ProjMan/" ++ defaultStoreBase ++ ".json") -- "./assets/project-management/entities.json" &= typFile
-  , policyStore = "./assets/project-management/policies.cedar" &= typFile
-  , logs        = "./assets/project-management/logs.json" &= typFile
+  -- constant factors
+  , max_user_projectload = 3 &= help "Max projects for user"
+
   } &= help "Generate Cedar project management case study"
 
 hotcrp = HC
@@ -197,6 +208,18 @@ numExercisedOverPriv totOk percEOP =
 
 preprocess :: Config -> Config
 preprocess conf@GC{..} =
+  conf
+  { size_start = size_start'
+  , size_incr  = size_incr'
+  , size_end   = size_end'
+  , priv_rep_ratio = priv_rep_ratio & max 0 & min 1
+  , over_priv_percent = over_priv_percent & max 0 & min 50
+  }
+  where
+    size_start' = max size_start 0
+    size_incr'  = max size_incr 1
+    size_end'   = max size_end size_start'
+preprocess conf@PM{..} =
   conf
   { size_start = size_start'
   , size_incr  = size_incr'

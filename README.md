@@ -103,10 +103,14 @@ entity types.
   that type is controlled directly by the family size and (optionally) a ratio
   argument.
 
-  For the Google classroom example, these entity types are: students, teachers,
-  and TAs (technically, Staff, where teachers and TAs are distinguished by their
-  role attribute, but we informally treat teachers and TAs as separate entity
-  types here).
+  - For the Google classroom example, these entity types are: students,
+    teachers, and TAs (technically, Staff, where teachers and TAs are
+    distinguished by their role attribute, but we informally treat teachers and
+    TAs as separate entity types here).
+
+  - For the project management example, these are projects and all users save
+    those designated project managers
+
 - A *secondary entity type* is one for which the realism-maintaining invariants
   require that the number of such entities be a (random) function of the number
   of entities of one or more primary or secondary entity types. The command line

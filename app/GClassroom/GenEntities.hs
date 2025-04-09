@@ -78,7 +78,7 @@ randomCourseCatalogWithTeachers conf teachFam = do
   let catalogFam = clsFam & map concat
   let staffFam =
         zipFamilyWith
-          (\ teach cl -> mkTeacher (show teach) cl)
+          (\ teach cl -> mkTeacher ("TE" ++ show teach) cl)
           teachFam clsFam
   return $ zip staffFam catalogFam
 
@@ -124,7 +124,7 @@ randomStudents ::
                  -> State g (Family [Student])
 randomStudents conf =
   randomPostFactoEntities (conf & maxStudentCourseload)
-    (\ id cl -> mkStudent (show id) cl)
+    (\ id cl -> mkStudent ("Stu" ++ show id) cl)
 
 randomAssignmentsByCourse ::
   RandomGen g => Config -> Family CourseCatalog -> State g (Family [CourseAssignments])
@@ -154,7 +154,8 @@ generateGrades conf catalogPools assignmentPools studentsFam =
   where
     gradeId :: Student -> Assignment -> String
     gradeId s a =
-      (a & uid & __entity & _id)
+      "G"
+      ++ (a & uid & __entity & _id)
       ++ "S"
       ++ (s & uid & __entity & _id)
 
@@ -163,23 +164,6 @@ generateGrades conf catalogPools assignmentPools studentsFam =
       stud <- newStudents
       assignment <- stud & findStudentAssignments catalog assignments
       return $ mkGrade (gradeId stud assignment) stud assignment
-
--- generateGrades ::
---   Config -> Pools [CourseEnrollment] -> Family [CourseAssignments]
---   -> Family [Grade]
-  -- zipFamilyWith
-  --   (\ studs assigns ->
-  --      [ mkGrade (gradeId s a) s a
-  --      | s <- studs , a <- assigns ])
-  --   courseEnrollmentPools (courseAssignmentsFam & toPools)
-  -- & map concat
-  -- where
-  --   gradeId :: Student -> Assignment -> String
-  --   gradeId s a =
-  --     (a & uid & __entity & _id)
-  --     ++ "S"
-  --     ++ (s & uid & __entity & _id)
-
 
 randomGClassroom :: RandomGen g => Config -> State g (Family GClassroom)
 randomGClassroom conf = do
@@ -194,27 +178,16 @@ randomGClassroom conf = do
   assignmentsFam :: Family [Assignment] <-
     randomAssignmentsByCourse conf catalogFam
     & fmap (map concat)
-  -- let studEnrollmentPools = groupStudentsByEnrollment catalogFam studsFam
   let gradesFam =
         generateGrades conf
           (catalogFam & toPools) (assignmentsFam & toPools)
           studsFam
-  -- generateGrades conf studEnrollmentPools assignmentsByCourseFam
   return $
     [ GClassroom studs catalog assigns grds ts tchs
     | studs <- studsFam
     | catalog <- catalogFam
-    | assigns <- assignmentsFam -- assignmentsByCourseFam & map concat
-    | grds <- gradesFam -- gradesPools
+    | assigns <- assignmentsFam
+    | grds <- gradesFam
     | ts <- tasFam
     | tchs <- teachersFam
     ]
-  where
-    groupStudentsByEnrollment :: Family CourseCatalog -> Family [Student] -> Pools [CourseEnrollment]
-    groupStudentsByEnrollment catalogFam studentsFam =
-      [ catalog & map (findCourseStudents students)
-      | catalog <- catalogFam & toPools
-      | students <- studentsFam & toPools ]
-      -- let finalStudents = studentsFam & fromFamily & last in
-      -- catalogFam
-      -- & mapFamily (findCourseStudents finalStudents)

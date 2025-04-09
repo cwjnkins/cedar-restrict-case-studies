@@ -4,14 +4,14 @@ cabal-version: 2.2
 --
 -- see: https://github.com/sol/hpack
 
-name:           cav2025-cedar-restrict-gclassroom
+name:           cedar-restrict-case-studies
 version:        0.1.0.0
 description:    Please see the README on GitHub at <https://github.com/githubuser/cav2025-cedar-restrict-gclassroom#readme>
 homepage:       https://github.com/githubuser/cav2025-cedar-restrict-gclassroom#readme
 bug-reports:    https://github.com/githubuser/cav2025-cedar-restrict-gclassroom/issues
-author:         Author name here
-maintainer:     example@example.com
-copyright:      2025 Author name here
+author:         Christa Jenkins
+maintainer:     Christa.Jenkins@stonybrook.edu
+copyright:      2025 Christa Jenkins
 license:        BSD-3-Clause
 license-file:   LICENSE
 build-type:     Simple
@@ -42,9 +42,9 @@ library
       Lib.Request
       Lib.Util
   other-modules:
-      Paths_cav2025_cedar_restrict_gclassroom
+      Paths_cedar_restrict_case_studies
   autogen-modules:
-      Paths_cav2025_cedar_restrict_gclassroom
+      Paths_cedar_restrict_case_studies
   hs-source-dirs:
       src
   ghc-options: -Wall -Wcompat -Widentities -Wincomplete-record-updates -Wincomplete-uni-patterns -Wmissing-export-lists -Wmissing-home-modules -Wpartial-fields -Wredundant-constraints
@@ -60,7 +60,7 @@ library
     , utf8-string
   default-language: Haskell2010
 
-executable cav2025-cedar-restrict-gclassroom-exe
+executable cedar-restrict-case-study
   main-is: Main.hs
   other-modules:
       Config
@@ -72,9 +72,9 @@ executable cav2025-cedar-restrict-gclassroom-exe
       ProjMan.Config
       ProjMan.GenEntities
       ProjMan.GenLogs
-      Paths_cav2025_cedar_restrict_gclassroom
+      Paths_cedar_restrict_case_studies
   autogen-modules:
-      Paths_cav2025_cedar_restrict_gclassroom
+      Paths_cedar_restrict_case_studies
   hs-source-dirs:
       app
   ghc-options: -Wall -Wcompat -Widentities -Wincomplete-record-updates -Wincomplete-uni-patterns -Wmissing-export-lists -Wmissing-home-modules -Wpartial-fields -Wredundant-constraints -threaded -rtsopts -with-rtsopts=-N
@@ -82,7 +82,7 @@ executable cav2025-cedar-restrict-gclassroom-exe
       aeson
     , base >=4.7 && <5
     , bytestring
-    , cav2025-cedar-restrict-gclassroom
+    , cedar-restrict-case-studies
     , cmdargs
     , list-shuffle
     , mtl
@@ -91,13 +91,13 @@ executable cav2025-cedar-restrict-gclassroom-exe
     , utf8-string
   default-language: Haskell2010
 
-test-suite cav2025-cedar-restrict-gclassroom-test
+test-suite cedar-restrict-case-study-test
   type: exitcode-stdio-1.0
   main-is: Spec.hs
   other-modules:
-      Paths_cav2025_cedar_restrict_gclassroom
+      Paths_cedar_restrict_case_studies
   autogen-modules:
-      Paths_cav2025_cedar_restrict_gclassroom
+      Paths_cedar_restrict_case_studies
   hs-source-dirs:
       test
   ghc-options: -Wall -Wcompat -Widentities -Wincomplete-record-updates -Wincomplete-uni-patterns -Wmissing-export-lists -Wmissing-home-modules -Wpartial-fields -Wredundant-constraints -threaded -rtsopts -with-rtsopts=-N
@@ -105,7 +105,7 @@ test-suite cav2025-cedar-restrict-gclassroom-test
       aeson
     , base >=4.7 && <5
     , bytestring
-    , cav2025-cedar-restrict-gclassroom
+    , cedar-restrict-case-studies
     , cmdargs
     , list-shuffle
     , mtl

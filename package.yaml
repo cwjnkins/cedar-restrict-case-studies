@@ -1,10 +1,10 @@
-name:                cav2025-cedar-restrict-gclassroom
+name:                cedar-restrict-case-studies
 version:             0.1.0.0
 github:              "githubuser/cav2025-cedar-restrict-gclassroom"
 license:             BSD-3-Clause
-author:              "Author name here"
-maintainer:          "example@example.com"
-copyright:           "2025 Author name here"
+author:              "Christa Jenkins"
+maintainer:          "Christa.Jenkins@stonybrook.edu"
+copyright:           "2025 Christa Jenkins"
 
 extra-source-files:
 - README.md
@@ -45,7 +45,7 @@ library:
   source-dirs: src
 
 executables:
-  cav2025-cedar-restrict-gclassroom-exe:
+  cedar-restrict-case-study:
     main:                Main.hs
     source-dirs:         app
     ghc-options:
@@ -54,10 +54,10 @@ executables:
     - -with-rtsopts=-N
     dependencies:
     - cmdargs
-    - cav2025-cedar-restrict-gclassroom
+    - cedar-restrict-case-studies
 
 tests:
-  cav2025-cedar-restrict-gclassroom-test:
+  cedar-restrict-case-study-test:
     main:                Spec.hs
     source-dirs:         test
     ghc-options:
@@ -65,4 +65,4 @@ tests:
     - -rtsopts
     - -with-rtsopts=-N
     dependencies:
-    - cav2025-cedar-restrict-gclassroom
+    - cedar-restrict-case-studies

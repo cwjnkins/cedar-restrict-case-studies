@@ -9,45 +9,50 @@ import Data.Maybe
 import Lib.Entity
 import Lib.ProjMan.Types
 
-assignToProject :: ProjMan -> User -> Project -> ProjMan
-assignToProject pm u p
-  | (u & attrs & role) == (roleDeveloper & uid) =
-    pm { developers =
-           developers pm
-         & (modifyAtUID (uid u) . addParent $ uid p)
-       }
-  | (u & attrs & role) == (rolePlanner & uid) =
-    pm { planners =
-           planners pm
-         & (modifyAtUID (uid u) . addParent $ uid p)
-       }
-  | (u & attrs & role) == (rolePM & uid) =
-    pm { progmanagers =
-           progmanagers pm
-         & (modifyAtUID (uid u) . addParent $ uid p)
-       }
-  | (u & attrs & role) == (roleAccountant & uid) =
-    pm { accountants =
-           accountants pm
-         & (modifyAtUID (uid u) . addParent $ uid p)
-       }
-  | otherwise = error $ "Unknown role: " ++ (show $ u & attrs & role)
+-- non ProjMan operations
+filterUsersByRole :: Role -> [User] -> [User]
+filterUsersByRole r users =
+  users & filter (\ u -> (u & attrs & role) == (r & uid))
 
-assignToLeadProject :: ProjMan -> User -> Project -> ProjMan
-assignToLeadProject pm u p =
-  pm { projects =
-         projects pm
-       & modifyAtUID (uid p)
-           (\ p -> p { attrs = ProjectAttrs (uid u) })
-     }
+-- assignToProject :: ProjMan -> User -> Project -> ProjMan
+-- assignToProject pm u p
+--   | (u & attrs & role) == (roleDeveloper & uid) =
+--     pm { developers =
+--            developers pm
+--          & (modifyAtUID (uid u) . addParent $ uid p)
+--        }
+--   | (u & attrs & role) == (rolePlanner & uid) =
+--     pm { planners =
+--            planners pm
+--          & (modifyAtUID (uid u) . addParent $ uid p)
+--        }
+--   | (u & attrs & role) == (rolePM & uid) =
+--     pm { progmanagers =
+--            progmanagers pm
+--          & (modifyAtUID (uid u) . addParent $ uid p)
+--        }
+--   | (u & attrs & role) == (roleAccountant & uid) =
+--     pm { accountants =
+--            accountants pm
+--          & (modifyAtUID (uid u) . addParent $ uid p)
+--        }
+--   | otherwise = error $ "Unknown role: " ++ (show $ u & attrs & role)
 
-findProjectManager :: ProjMan -> Project -> User
-findProjectManager pm p =
-    users pm
-  & find (\u -> uid u == (p & attrs & manager))
-  & fromJust
+-- assignToLeadProject :: ProjMan -> User -> Project -> ProjMan
+-- assignToLeadProject pm u p =
+--   pm { projects =
+--          projects pm
+--        & modifyAtUID (uid p)
+--            (\ p -> p { attrs = ProjectAttrs (uid u) })
+--      }
 
-filterUsersByProject :: Project -> [User] -> [User]
-filterUsersByProject p us =
-    us
-  & filter (\u -> uid p `elem` parents u)
+-- findProjectManager :: ProjMan -> Project -> User
+-- findProjectManager pm p =
+--     users pm
+--   & find (\u -> uid u == (p & attrs & manager))
+--   & fromJust
+
+-- filterUsersByProject :: Project -> [User] -> [User]
+-- filterUsersByProject p us =
+--     us
+--   & filter (\u -> uid p `elem` parents u)

@@ -21,7 +21,7 @@ import Config
 import qualified GClassroom.GenEntities as GC
 import qualified GClassroom.GenLogs     as GC
 import qualified ProjMan.GenEntities    as PM
-import qualified ProjMan.GenLogs        as PM
+-- import qualified ProjMan.GenLogs        as PM
 import qualified HotCRP.GenEntities     as HC
 
 main :: IO ()
@@ -58,31 +58,26 @@ main = do
         | path <- conf & logStoreFP
         ] & sequence
       return ()
-      -- GC.toGClassEntities gclass & encodeFile entityStore
-      -- let (log, _) = GC.createEventLog conf gclass & flip runState g'
-      -- res <-
-      --   forM log $ \ req -> do
-      --     dec <-
-      --       authorize'
-      --         (CedarCtxt "cedar" Nothing entityStore policyStore)
-      --        req
-      --     return $ LogEntry req dec
-      -- encodeFile logs res
 
     pm :: Config -> IO ()
     pm conf@PM{..} = do
       let gen = mkStdGen seed
-      let (projman, g') = PM.randomProjMan conf & flip runState gen
-      PM.toPMEntities projman & encodeFile entityStore
-      let (log, _) = PM.createEventLog conf projman & flip runState g'
-      res <-
-        forM log $ \req -> do
-          dec <-
-            authorize'
-              (CedarCtxt "cedar" Nothing entityStore policyStore)
-              req
-          return $ LogEntry req dec
-      encodeFile logs res
+      let (projmanFam, g') = PM.randomProjMan conf & flip runState gen
+      [ encodeFile path (pms & PM.toPMEntities)
+        | pms <- projmanFam & toPoolsGen PM.mergeProjMan
+        | path <- conf & entityStoreFP
+        ] & sequence
+      return ()
+      -- PM.toPMEntities projman & encodeFile entityStore
+      -- let (log, _) = PM.createEventLog conf projman & flip runState g'
+      -- res <-
+      --   forM log $ \req -> do
+      --     dec <-
+      --       authorize'
+      --         (CedarCtxt "cedar" Nothing entityStore policyStore)
+      --         req
+      --     return $ LogEntry req dec
+      -- encodeFile logs res
 
     hc :: Config -> IO ()
     hc conf@HC{..} = do

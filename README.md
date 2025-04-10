@@ -270,11 +270,9 @@ for usage instructions. For example, for the default GClassroom case study,
 
 ## Setup
 
-TODO
+- recommend letting ghcup manage stack
 
-I suggest using GHCUp to install the Haskell toolchain. Then, run `stack update`
-(anywhere) to update Stack's repository cache, then (in project root directory)
-`stack build`.
+- `stack update` to refresh package 
 
 ## Directory
 

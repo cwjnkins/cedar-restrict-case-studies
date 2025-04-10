@@ -126,10 +126,10 @@ entityStoreFP conf@PM{..} =
 entityStoreFP _ = []
 
 logStoreFP :: Config -> Family FilePath
-logStoreFP GC{..} =
+logStoreFP conf@GC{..} =
   [ defaultDist ++ "GClassroom/" ++ log_store_basename ++ "." ++ show i ++ ".json"
   | i <- conf & sizes ]
-logStoreFP PM{..} =
+logStoreFP conf@PM{..} =
   [ defaultDist ++ "ProjMan/" ++ log_store_basename ++ "." ++ show i ++ ".json"
   | i <- conf & sizes ]
 logStoreFP conf = []
@@ -195,7 +195,7 @@ hotcrp = HC
   , logs        = "./assets/hotcrp/logs.json" &= typFile
   } &= help "Generate Cedar HotCRP case study"
 
-conf =
+defaultConf =
      modes [gclass, projman, hotcrp]
   &= summary "Generate Cedar case studies"
   &= program "cedar-restrict-case-stuy"

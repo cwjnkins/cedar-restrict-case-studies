@@ -27,7 +27,7 @@ import qualified HotCRP.GenEntities     as HC
 main :: IO ()
 main = do
   cnf <- do
-    tmp <- cmdArgs conf
+    tmp <- cmdArgs defaultConf
     return $ tmp & preprocess
   case cnf of
     GC{..} -> gc cnf
@@ -45,16 +45,24 @@ main = do
       let (logFam, _) = GC.createEventLog conf gclassFam & flip runState g'
       -- sanity check: even though it will take longer, rerun old requests under
       -- a new entity store to help detect bugs
-      resPool <-
-        [ forM log
-            (\ req -> do
-                dec <- authorize' (CedarCtxt "cedar" Nothing entityStore policy_store) req
-                return $ LogEntry req dec)
-          | log <- logFam & toPools
+      putStrLn . show $ length logFam {- logFam & length -}
+      resFam <-
+        [ do
+            ret <-
+              forM log
+                (\ req -> do
+                    dec <- authorize' (CedarCtxt "cedar" Nothing entityStore policy_store) req
+                    return $ LogEntry req dec)
+            putStrLn . show $ i
+            return ret
+          | log <- logFam
           | entityStore <- conf & entityStoreFP
+          | i <- conf & sizes
         ] & sequence
-      [ encodeFile path res
-        | res <- resPool
+      [ do
+          putStrLn path
+          encodeFile path res
+        | res <- toPools resFam
         | path <- conf & logStoreFP
         ] & sequence
       return ()

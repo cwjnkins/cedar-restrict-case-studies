@@ -45,7 +45,6 @@ main = do
       let (logFam, _) = GC.createEventLog conf gclassFam & flip runState g'
       -- sanity check: even though it will take longer, rerun old requests under
       -- a new entity store to help detect bugs
-      putStrLn . show $ length logFam {- logFam & length -}
       resFam <-
         [ do
             ret <-
